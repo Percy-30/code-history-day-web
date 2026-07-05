@@ -135,20 +135,20 @@ ${formattedEphemeris.event}`
     if (!todayEphemeris) return
 
     const formattedEphemeris = formatEphemerisForDisplay(todayEphemeris)
-    
+
     // Truncar solo el evento a 200 caracteres si es necesario
     let eventText = formattedEphemeris.event
     if (eventText.length > 200) {
       eventText = eventText.substring(0, 197) + '...'
     }
-    
+
     const tweetText = `💻 ${eventText}
 
 ℹ️ Cada día una nueva efeméride en `
-    
+
     const url = window.location.href
     const xUrl = `https://x.com/intent/tweet?text=${encodeURIComponent(tweetText)}&url=${encodeURIComponent(url)}`
-    
+
     window.open(xUrl, '_blank', 'width=550,height=420')
   }
 
@@ -236,7 +236,7 @@ ${formattedEphemeris.event}`
           <div className="space-y-4">
             {/* Welcome Message */}
             <div className="text-green-300 backdrop-blur-sm bg-black/10 rounded p-2">
-              <span className="text-green-500 font-bold">user@mouredev:~$</span>
+              <span className="text-green-500 font-bold">user@atpdev:~$</span>
               <span className="ml-2">./code-history --day</span>
             </div>
 
@@ -283,42 +283,42 @@ ${formattedEphemeris.event}`
             </div>
 
             {/* Ephemeris Content with Enhanced Glass Effect */}
-                          <div className="backdrop-blur-md bg-gradient-to-br from-gray-900/40 to-black/60 border border-green-500/30 rounded-xl p-6 mt-6 shadow-2xl shadow-green-500/10">
-                <div className="flex items-start gap-2 text-green-300 mb-4">
-                  <Code className="w-5 h-5 min-w-[20px] min-h-[20px] animate-pulse flex-shrink-0 mt-0.5" />
-                  <span className="font-bold text-lg bg-gradient-to-r from-green-300 to-emerald-300 bg-clip-text text-transparent">
-                    EFEMÉRIDE DEL DÍA
-                  </span>
-                </div>
-
-                {renderEphemerisContent()}
-                
-                {/* Botón de compartir en X */}
-                {todayEphemeris && !isLoading && (
-                  <div className="flex justify-end mt-4">
-                    <button
-                      onClick={handleShareX}
-                      className="flex items-center gap-2 px-3 py-2 bg-green-500/20 hover:bg-green-500/30 border border-green-400/30 hover:border-green-400/50 rounded-lg transition-all duration-200 group backdrop-blur-sm"
-                      title="Compartir en X"
-                    >
-                      <XLogo className="text-green-400 group-hover:text-green-300" size={16} />
-                      <span className="text-green-400 group-hover:text-green-300 text-sm font-medium">
-                        Compartir
-                      </span>
-                    </button>
-                  </div>
-                )}
+            <div className="backdrop-blur-md bg-gradient-to-br from-gray-900/40 to-black/60 border border-green-500/30 rounded-xl p-6 mt-6 shadow-2xl shadow-green-500/10">
+              <div className="flex items-start gap-2 text-green-300 mb-4">
+                <Code className="w-5 h-5 min-w-[20px] min-h-[20px] animate-pulse flex-shrink-0 mt-0.5" />
+                <span className="font-bold text-lg bg-gradient-to-r from-green-300 to-emerald-300 bg-clip-text text-transparent">
+                  EFEMÉRIDE DEL DÍA
+                </span>
               </div>
+
+              {renderEphemerisContent()}
+
+              {/* Botón de compartir en X */}
+              {todayEphemeris && !isLoading && (
+                <div className="flex justify-end mt-4">
+                  <button
+                    onClick={handleShareX}
+                    className="flex items-center gap-2 px-3 py-2 bg-green-500/20 hover:bg-green-500/30 border border-green-400/30 hover:border-green-400/50 rounded-lg transition-all duration-200 group backdrop-blur-sm"
+                    title="Compartir en X"
+                  >
+                    <XLogo className="text-green-400 group-hover:text-green-300" size={16} />
+                    <span className="text-green-400 group-hover:text-green-300 text-sm font-medium">
+                      Compartir
+                    </span>
+                  </button>
+                </div>
+              )}
+            </div>
 
             {/* Footer with Subtle Glow */}
             <div className="mt-8 text-green-600 text-xs backdrop-blur-sm bg-black/10 rounded-lg p-2">
               {/* Interactive Terminal */}
-              <div 
+              <div
                 className="text-green-500 mb-4 backdrop-blur-sm bg-black/10 rounded text-base cursor-text"
                 onClick={handleTerminalClick}
               >
-                                <div className="flex items-center">
-                  <span className="font-bold whitespace-nowrap text-green-500">user@mouredev:~$</span>
+                <div className="flex items-center">
+                  <span className="font-bold whitespace-nowrap text-green-500">user@atpdev:~$</span>
                   <div className="ml-2 flex-1 relative">
                     <div className="relative">
                       <div className="text-green-300 font-mono whitespace-nowrap overflow-hidden max-w-full">
@@ -350,7 +350,7 @@ ${formattedEphemeris.event}`
                   </div>
                 </div>
               </div>
-              
+
               <div className="text-center">
                 {!isMobile && (
                   <div className="flex items-center justify-center gap-2">
@@ -359,26 +359,30 @@ ${formattedEphemeris.event}`
                   </div>
                 )}
                 <div className="mt-2 text-green-500/70">
-                  © 2025{" "}
-                  <a 
-                    href="https://moure.dev" 
-                    target="_blank" 
+                  © 2026{" "}
+                  <a
+                    href="https://github.com/Percy-30"
+                    target="_blank"
                     rel="noopener noreferrer"
                     className="hover:text-green-400 transition-colors duration-200 underline decoration-green-500/50 hover:decoration-green-400"
                   >
-                    MoureDev by Brais Moure
+                    ATP Dev by Percy AT
                   </a>
                 </div>
-                                 <div className="mt-2 text-green-500/70">
-                   <a 
-                     href="https://github.com/mouredev/code-history-day-web" 
-                     target="_blank" 
-                     rel="noopener noreferrer"
-                     className="hover:text-green-400 transition-colors duration-200 underline decoration-green-500/50 hover:decoration-green-400"
-                   >
-                     Desarrollado con <span className="text-red-400 animate-pulse">❤️</span> desde Galicia para el mundo
-                   </a>
-                 </div>
+                <div className="mt-2 text-green-500/70">
+                  Desarrollado con <span className="text-red-400 animate-pulse">❤️</span> desde Andahuaylas, Perú
+                </div>
+                <div className="mt-1 text-green-500/70 text-[10px]">
+                  Basado en el proyecto original de{" "}
+                  <a
+                    href="https://github.com/mouredev/code-history-day-web"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:text-green-400 transition-colors duration-200 underline decoration-green-500/50 hover:decoration-green-400"
+                  >
+                    MoureDev
+                  </a>
+                </div>
               </div>
             </div>
           </div>
