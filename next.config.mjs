@@ -8,6 +8,13 @@ const nextConfig = {
   },
   images: {
     unoptimized: true,
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'image.pollinations.ai',
+        pathname: '/prompt/**',
+      },
+    ],
   },
   webpack: (config, { isServer }) => {
     if (!isServer) {

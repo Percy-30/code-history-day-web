@@ -18,6 +18,10 @@ yarn-error.log*
 
 # env files
 .env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
 
 # vercel
 .vercel
@@ -26,5 +30,14 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# Cursor IDE configuration
+# Build output
+dist/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE configs
 .cursor/
+.vscode/
+.idea/

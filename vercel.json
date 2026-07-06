@@ -1,0 +1,16 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/generate",
+      "schedule": "0 11 * * *"
+    },
+    {
+      "path": "/api/cron/check-drive",
+      "schedule": "*/30 * * * *"
+    },
+    {
+      "path": "/api/cron/publish",
+      "schedule": "*/30 * * * *"
+    }
+  ]
+}
