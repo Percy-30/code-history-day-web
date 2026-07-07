@@ -6,11 +6,11 @@
     },
     {
       "path": "/api/cron/check-drive",
-      "schedule": "*/30 * * * *"
+      "schedule": "0 13 * * *"
     },
     {
       "path": "/api/cron/publish",
-      "schedule": "*/30 * * * *"
+      "schedule": "0 15 * * *"
     }
   ]
 }
