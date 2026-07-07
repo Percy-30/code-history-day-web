@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
   // Intercambiar código por access token
   const clientKey = process.env.TIKTOK_CLIENT_KEY!
   const clientSecret = process.env.TIKTOK_CLIENT_SECRET!
-  const redirectUri = `${process.env.NEXTAUTH_URL}/oauth2callback`
+  const redirectUri = `${process.env.NEXTAUTH_URL}/api/tiktok/callback`
 
   try {
     const tokenRes = await fetch('https://open.tiktokapis.com/v2/oauth/token/', {
