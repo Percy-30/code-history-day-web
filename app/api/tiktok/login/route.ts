@@ -4,7 +4,7 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const TIKTOK_CLIENT_KEY = process.env.TIKTOK_CLIENT_KEY;
   const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
-  const REDIRECT_URI = `${SITE_URL}/api/auth/tiktok/callback`;
+  const REDIRECT_URI = `${SITE_URL}/api/tiktok/callback`;
 
   if (!TIKTOK_CLIENT_KEY) {
     return NextResponse.json({ error: 'TIKTOK_CLIENT_KEY no está configurado.' }, { status: 500 });
