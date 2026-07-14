@@ -11,8 +11,6 @@ const path = require('path')
 const publisher = require('../services/publisher.js')
 const { BOT_TOKEN, CHAT_ID, SUPABASE_URL, SUPABASE_KEY, SCENES_BASE_DIR, INTRO_DIR, OUTRO_DIR, LOGOS_DIR, BGM_DIR } = config
 
-let { TODAY, SCENES_DIR, sceneCounter, totalScenes, receivedScenes, downloadQueue, isDownloading, savedAudioScript, motorVozActivo, velocidadVozActiva, pendingUploadMode, audioUploadCounter, failedClips, cancelRequested } = state
-
 let globalBot = null;
 async function safeSend(text, opts = {}) {
   if (!globalBot) return;
@@ -59,7 +57,7 @@ module.exports = function registerCommands(bot) {
     return
   }
   if (text === '/ver_descripcion_post') {
-    const txtPath = path.join(SCENES_DIR, `post_text_${TODAY}.txt`)
+    const txtPath = path.join(state.SCENES_DIR, `post_text_${state.TODAY}.txt`)
     if (fs.existsSync(txtPath)) {
       const desc = fs.readFileSync(txtPath, 'utf8')
       await safeSend('📝 *Descripción del post (toca el siguiente mensaje para copiar):*', { parse_mode: 'Markdown' })
@@ -73,15 +71,15 @@ module.exports = function registerCommands(bot) {
   if (text === '/publicar_video') {
     // Buscar el mejor formato disponible para publicar
     const formatsToCheck = [
-      { file: `${TODAY}_shorts_final.mp4`, label: '📱 Vertical 9:16 (Shorts)', platform: 'TikTok/Reels' },
-      { file: `${TODAY}_vertical_9x16.mp4`, label: '📱 Vertical 9:16', platform: 'TikTok/Reels' },
-      { file: `${TODAY}_final.mp4`,         label: '🎬 Master',         platform: 'General' },
-      { file: `${TODAY}_master.mp4`,        label: '🎬 Master',         platform: 'General' },
+      { file: `${state.TODAY}_shorts_final.mp4`, label: '📱 Vertical 9:16 (Shorts)', platform: 'TikTok/Reels' },
+      { file: `${state.TODAY}_vertical_9x16.mp4`, label: '📱 Vertical 9:16', platform: 'TikTok/Reels' },
+      { file: `${state.TODAY}_final.mp4`,         label: '🎬 Master',         platform: 'General' },
+      { file: `${state.TODAY}_master.mp4`,        label: '🎬 Master',         platform: 'General' },
     ]
     let videoPath = null
     let videoLabel = ''
     for (const f of formatsToCheck) {
-      const p = path.join(SCENES_DIR, f.file)
+      const p = path.join(state.SCENES_DIR, f.file)
       if (fs.existsSync(p)) { videoPath = p; videoLabel = f.label; break }
     }
 
@@ -100,7 +98,7 @@ module.exports = function registerCommands(bot) {
     // Obtener texto del post para la descripción
     let postTextPreview = 'Sin descripción disponible.'
     try {
-      const txtPath = path.join(SCENES_DIR, `post_text_${TODAY}.txt`)
+      const txtPath = path.join(state.SCENES_DIR, `post_text_${state.TODAY}.txt`)
       if (fs.existsSync(txtPath)) {
         postTextPreview = fs.readFileSync(txtPath, 'utf8').substring(0, 300)
       }
@@ -134,8 +132,8 @@ module.exports = function registerCommands(bot) {
 
   // /generar_dia — Generar la eféméride completa del día: TXTs, portada, y prompt Meta AI
   if (text === '/publicar_post') {
-    const imgPath = path.join(SCENES_DIR, `ephemeris_${TODAY}.jpg`)
-    const txtPath = path.join(SCENES_DIR, `post_text_${TODAY}.txt`)
+    const imgPath = path.join(state.SCENES_DIR, `ephemeris_${state.TODAY}.jpg`)
+    const txtPath = path.join(state.SCENES_DIR, `post_text_${state.TODAY}.txt`)
 
     if (!fs.existsSync(imgPath)) {
       await bot.sendMessage(CHAT_ID,
@@ -157,7 +155,7 @@ module.exports = function registerCommands(bot) {
         const drive = google.drive({ version: 'v3', auth: oauth2 })
 
         const folderSearch = await drive.files.list({
-          q: `'${process.env.GOOGLE_DRIVE_FOLDER_ID}' in parents and name='${TODAY}' and mimeType='application/vnd.google-apps.folder'`,
+          q: `'${process.env.GOOGLE_DRIVE_FOLDER_ID}' in parents and name='${state.TODAY}' and mimeType='application/vnd.google-apps.folder'`,
           fields: 'files(id,name)'
         })
         const dayFolder = folderSearch.data.files[0]
@@ -198,11 +196,11 @@ module.exports = function registerCommands(bot) {
       try {
         // Obtener la efeméride del día desde Supabase
         const ephemRes = await axios.get(
-          `${SUPABASE_URL}/rest/v1/ephemerides?display_date=eq.${TODAY}&limit=1&select=event,historical_day,historical_month,historical_year`,
+          `${SUPABASE_URL}/rest/v1/ephemerides?display_date=eq.${state.TODAY}&limit=1&select=event,historical_day,historical_month,historical_year`,
           { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
         )
         const monthNames = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre']
-        let fechaHistorica = TODAY
+        let fechaHistorica = state.TODAY
         let eventoTexto = 'Efeméride tecnológica del día'
 
         if (Array.isArray(ephemRes.data) && ephemRes.data.length > 0) {
@@ -279,7 +277,7 @@ module.exports = function registerCommands(bot) {
       // Usar post generado por IA o fallback mínimo
       const postToSave = generatedPost || (
         `🚀 CodeHistory Daily | Efeméride Tecnológica del Día\n\n` +
-        `📅 ${TODAY}\n\n` +
+        `📅 ${state.TODAY}\n\n` +
         `Descubre la historia tecnológica de hoy en CodeHistory Daily.\n\n` +
         `🌍 Más historias tecnológicas:\nhttps://code-history-day-web-alpha.vercel.app\n\n` +
         `▶️ youtube.com/@CodeHistoryDaily\n\n` +
@@ -347,7 +345,7 @@ module.exports = function registerCommands(bot) {
   if (text.startsWith('/generar_dia')) {
     const parts = (msg.text || '').trim().split(' ')
     const specificDate = parts.length > 1 ? parts[1] : null
-    const targetDate = specificDate || TODAY
+    const targetDate = specificDate || state.TODAY
 
     await bot.sendMessage(CHAT_ID,
       `🚀 *Iniciando generación completa para ${targetDate}...*\n` +
@@ -370,10 +368,10 @@ module.exports = function registerCommands(bot) {
 
       await bot.sendMessage(CHAT_ID, `✅ Guión generado (${cronRes.data.scenes_count} escenas). Paso 2/3 — Descargando archivos...`)
 
-      // 2. Actualizar TODAY y SCENES_DIR a la fecha generada
-      TODAY = targetDate
-      SCENES_DIR = path.join(SCENES_BASE_DIR, TODAY)
-      if (!fs.existsSync(SCENES_DIR)) fs.mkdirSync(SCENES_DIR, { recursive: true })
+      // 2. Actualizar state.TODAY y state.SCENES_DIR a la fecha generada
+      state.TODAY = targetDate
+      state.SCENES_DIR = path.join(SCENES_BASE_DIR, state.TODAY)
+      if (!fs.existsSync(state.SCENES_DIR)) fs.mkdirSync(state.SCENES_DIR, { recursive: true })
 
       // 3. Descargar los TXTs desde Drive (leer de Supabase para obtener el folder ID)
       // Usamos las constantes del nivel superior: SUPABASE_URL y SUPABASE_KEY (definidas al inicio del archivo)
@@ -468,10 +466,10 @@ Aquí tienes *toda la narración para el audio del video*:
 Empezamos con el FOTOGRAMA 1`
 
           // Guardar TXTs en la carpeta del día
-          fs.writeFileSync(path.join(SCENES_DIR, `01_guion_audio_${targetDate}.txt`), textAudio, 'utf8')
-          fs.writeFileSync(path.join(SCENES_DIR, `03_prompts_video_animacion_${targetDate}.txt`), textVideo, 'utf8')
-          fs.writeFileSync(path.join(SCENES_DIR, `02_prompts_imagenes_${targetDate}.txt`), textImagenes, 'utf8')
-          fs.writeFileSync(path.join(SCENES_DIR, `06_prompt_meta_ai_master_${targetDate}.txt`), metaAIPromptText, 'utf8')
+          fs.writeFileSync(path.join(state.SCENES_DIR, `01_guion_audio_${targetDate}.txt`), textAudio, 'utf8')
+          fs.writeFileSync(path.join(state.SCENES_DIR, `03_prompts_video_animacion_${targetDate}.txt`), textVideo, 'utf8')
+          fs.writeFileSync(path.join(state.SCENES_DIR, `02_prompts_imagenes_${targetDate}.txt`), textImagenes, 'utf8')
+          fs.writeFileSync(path.join(state.SCENES_DIR, `06_prompt_meta_ai_master_${targetDate}.txt`), metaAIPromptText, 'utf8')
 
           await bot.sendMessage(CHAT_ID, `✅ Paso 2/4 — 4 archivos TXT guardados en \`scenes/${targetDate}/\``)
 
@@ -483,7 +481,7 @@ Empezamos con el FOTOGRAMA 1`
               ephemerisTitleMatch || 'Evento Histórico',
               ephemerisText || 'Efeméride tecnológica.'
             )
-            fs.writeFileSync(path.join(SCENES_DIR, `07_prompts_shorts_luma_${targetDate}.txt`), shortsPrompts, 'utf8')
+            fs.writeFileSync(path.join(state.SCENES_DIR, `07_prompts_shorts_luma_${targetDate}.txt`), shortsPrompts, 'utf8')
             
             const scenesOut = shortsPrompts.split('|||ESCENA|||')
             await bot.sendMessage(CHAT_ID, `🎥 *Prompts para Shorts (Cópialos uno por uno):*`, { parse_mode: 'Markdown' })
@@ -572,11 +570,11 @@ Empezamos con el FOTOGRAMA 1`
   }
   // "listo" — Confirmar antes de ensamblar el video final
   if (text.toLowerCase() === 'listo') {
-    if (isDownloading) {
+    if (state.isDownloading) {
       await bot.sendMessage(CHAT_ID, '⏳ *¡Aún estoy descargando los clips!*\nPor favor espera a que termine (te avisaré con un mensaje) antes de empezar el ensamblaje.', { parse_mode: 'Markdown' })
       return
     }
-    const existingClips = fs.readdirSync(SCENES_DIR).filter(f => f.endsWith('.mp4') && !f.includes('final') && !f.includes('output') && !f.includes('proc_'))
+    const existingClips = fs.readdirSync(state.SCENES_DIR).filter(f => f.endsWith('.mp4') && !f.includes('final') && !f.includes('output') && !f.includes('proc_'))
     if (existingClips.length === 0) {
       await bot.sendMessage(CHAT_ID, '⚠️ No encontré ningún clip en disco. Reenvíame los videos de Meta AI primero.')
       return
@@ -585,10 +583,10 @@ Empezamos con el FOTOGRAMA 1`
     // Detectar intro/outro
     const introFiles = fs.existsSync(INTRO_DIR) ? fs.readdirSync(INTRO_DIR).filter(f => f.endsWith('.mp4')).sort().reverse() : []
     const outroFiles = fs.existsSync(OUTRO_DIR) ? fs.readdirSync(OUTRO_DIR).filter(f => f.endsWith('.mp4')).sort().reverse() : []
-    const hasScript = fs.existsSync(path.join(SCENES_DIR, 'script.json'))
+    const hasScript = fs.existsSync(path.join(state.SCENES_DIR, 'script.json'))
 
     // Detectar narración completa
-    const narracionFiles = fs.readdirSync(SCENES_DIR).filter(f => f.startsWith('narracion_completa') && /\.(mp3|ogg|m4a|wav|aac|opus)$/i.test(f))
+    const narracionFiles = fs.readdirSync(state.SCENES_DIR).filter(f => f.startsWith('narracion_completa') && /\.(mp3|ogg|m4a|wav|aac|opus)$/i.test(f))
     const hasNarracionCompleta = narracionFiles.length > 0
 
     // Contar audios subidos manualmente
@@ -596,7 +594,7 @@ Empezamos con el FOTOGRAMA 1`
     const uploadedAudios = fs.existsSync(audioDir)
       ? fs.readdirSync(audioDir).filter(f => /\.(mp3|ogg|m4a|wav|aac|opus)$/i.test(f)).length
       : 0
-    const ttsAudios = fs.readdirSync(SCENES_DIR).filter(f => f.startsWith('voiceover_') && f.endsWith('.mp3')).length
+    const ttsAudios = fs.readdirSync(state.SCENES_DIR).filter(f => f.startsWith('voiceover_') && f.endsWith('.mp3')).length
     const totalAudios = uploadedAudios + ttsAudios
     
     let audioStatus = `⚠️ Sin audios — el video tendrá silencio`
@@ -616,7 +614,7 @@ Empezamos con el FOTOGRAMA 1`
           ]
         ] : [
           [
-            { text: `🗣️ Cambiar voz (actual: ${motorVozActivo.replace('es-MX-', '').replace('es-ES-', '').replace('Neural', '')})`, callback_data: 'pre_ensamble_voz' }
+            { text: `🗣️ Cambiar voz (actual: ${state.motorVozActivo.replace('es-MX-', '').replace('es-ES-', '').replace('Neural', '')})`, callback_data: 'pre_ensamble_voz' }
           ],
           [
             { text: '🎬 ¡Ensamblar con esta voz!', callback_data: 'confirm_ensamble' },
@@ -629,7 +627,7 @@ Empezamos con el FOTOGRAMA 1`
     await bot.sendMessage(CHAT_ID,
       `🎬 *Resumen antes de ensamblar:*\n\n` +
       `🎥 Clips: *${existingClips.length}*\n` +
-      `🗣️ Voz TTS: ${hasNarracionCompleta ? 'Ignorada (usando audio completo)' : `*${motorVozActivo}*`}\n` +
+      `🗣️ Voz TTS: ${hasNarracionCompleta ? 'Ignorada (usando audio completo)' : `*${state.motorVozActivo}*`}\n` +
       `🎙️ Guion/Audios: ${hasScript ? `✅ script.json cargado` : (hasNarracionCompleta ? `✅ Modo profesional` : (totalAudios > 0 ? `✅ audios subidos manualmente` : `⚠️ Sin guion (sin narración)`))}\n` +
       `📢 Estado audio: ${audioStatus}\n` +
       `🎬 Intro: ${introFiles.length > 0 ? `✅ \`${introFiles[0]}\`` : '⚠️ Sin intro'}\n` +
@@ -642,7 +640,7 @@ Empezamos con el FOTOGRAMA 1`
 
   // /subir_audio_text — Activar modo espera de texto narración F1-F25
   if (text === '/subir_audio_text') {
-    pendingUploadMode = 'audio_text'
+    state.pendingUploadMode = 'audio_text'
     await bot.sendMessage(CHAT_ID,
       `📝 *Modo: Subir NARRACIÓN en TEXTO activado*\n\n` +
       `Pega ahora el texto completo con el formato F1-F25 que te dio Meta AI.\n\n` +
@@ -661,7 +659,7 @@ Empezamos con el FOTOGRAMA 1`
   const rawText = msg.text || ''
   const looksLikeGuion = (
     text.startsWith('/guion') ||
-    pendingUploadMode === 'audio_text' ||
+    state.pendingUploadMode === 'audio_text' ||
     rawText.trim().startsWith('=== GUION') ||
     rawText.trim().startsWith('*NARRACIÓN') ||
     rawText.trim().startsWith('NARRACIÓN COMPLETA') ||
@@ -695,14 +693,14 @@ Empezamos con el FOTOGRAMA 1`
 
       if (framesData.length > 0) {
         framesData.sort((a, b) => a.frame - b.frame)
-        fs.writeFileSync(path.join(SCENES_DIR, 'script.json'), JSON.stringify(framesData, null, 2), 'utf8')
+        fs.writeFileSync(path.join(state.SCENES_DIR, 'script.json'), JSON.stringify(framesData, null, 2), 'utf8')
 
         const escapeHTML = str => (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
         const preview = framesData.slice(0, 5)
           .map(f => `  <b>F${f.frame}:</b> ${escapeHTML(f.text.substring(0, 60))}${f.text.length > 60 ? '…' : ''}`)
           .join('\n')
 
-        pendingUploadMode = null // Limpiar modo al recibir el texto
+        state.pendingUploadMode = null // Limpiar modo al recibir el texto
         await bot.sendMessage(CHAT_ID,
           `✅ <b>¡Guion detectado!</b> ${framesData.length} fotogramas F1-F25 parseados.\n\n` +
           `<b>Vista previa:</b>\n${preview}\n\n` +
@@ -730,15 +728,15 @@ Empezamos con el FOTOGRAMA 1`
             } else {
               await bot.sendMessage(CHAT_ID, `🎙️ <b>Generando audio TTS...</b>`, { parse_mode: 'HTML' })
             }
-            const audioPath = path.join(SCENES_DIR, 'narracion_completa.mp3')
-            const textPath = path.join(SCENES_DIR, 'temp_text_completo.txt')
+            const audioPath = path.join(state.SCENES_DIR, 'narracion_completa.mp3')
+            const textPath = path.join(state.SCENES_DIR, 'temp_text_completo.txt')
             fs.writeFileSync(textPath, fullText, 'utf8')
 
             let exitoTTS = false
             const result = spawnSync('python', [
               '-m', 'edge_tts',
-              '--voice', motorVozActivo,
-              `--rate=${velocidadVozActiva}`,
+              '--voice', state.motorVozActivo,
+              `--rate=${state.velocidadVozActiva}`,
               '-f', textPath,
               '--write-media', audioPath
             ], { encoding: 'utf8', timeout: 60000 })
@@ -775,7 +773,7 @@ Empezamos con el FOTOGRAMA 1`
           .replace(/\n{3,}/g, '\n\n')
           .trim()
         if (cleanFallback.length > 50) {
-          fs.writeFileSync(path.join(SCENES_DIR, 'script.txt'), cleanFallback, 'utf8')
+          fs.writeFileSync(path.join(state.SCENES_DIR, 'script.txt'), cleanFallback, 'utf8')
           await bot.sendMessage(CHAT_ID,
             `⚠️ <b>No detecté el formato F1:, F2: correctamente.</b>\n` +
             `Guardé el texto como fallback en <code>script.txt</code>.\n\n` +
@@ -822,7 +820,7 @@ Empezamos con el FOTOGRAMA 1`
       return
     }
 
-    pendingUploadMode = 'musica_' + tagArg
+    state.pendingUploadMode = 'musica_' + tagArg
     const musicDir = require('path').join(__dirname, '..', 'assets', 'audio', 'music')
     const existing = require('fs').existsSync(require('path').join(musicDir, tagArg + '.mp3'))
 
@@ -869,8 +867,8 @@ Empezamos con el FOTOGRAMA 1`
   }
 
   if (text === '/subir_audio_completo') {
-    pendingUploadMode = 'audio_completo'
-    const existing = path.join(SCENES_DIR, 'narracion_completa.mp3')
+    state.pendingUploadMode = 'audio_completo'
+    const existing = path.join(state.SCENES_DIR, 'narracion_completa.mp3')
     const hasExisting = fs.existsSync(existing)
     await bot.sendMessage(CHAT_ID,
       `🎙️ *Modo: Subir NARRACIÓN COMPLETA activado*\n\n` +
@@ -890,7 +888,7 @@ Empezamos con el FOTOGRAMA 1`
     const existing = fs.existsSync(INTRO_DIR)
       ? fs.readdirSync(INTRO_DIR).filter(f => f.endsWith('.mp4')).sort().reverse()
       : []
-    pendingUploadMode = 'intro'
+    state.pendingUploadMode = 'intro'
     let msg2 = `🎬 *Modo: Subir INTRO activado*\n\nEnvíame ahora el video de intro (máx. 5 segundos).\nSe guardará con timestamp y se usará en todos los ensamblajes.\n\n`
     if (existing.length > 0) {
       msg2 += `📁 *Versiones guardadas (${existing.length}):*\n`
@@ -908,7 +906,7 @@ Empezamos con el FOTOGRAMA 1`
     const existing = fs.existsSync(OUTRO_DIR)
       ? fs.readdirSync(OUTRO_DIR).filter(f => f.endsWith('.mp4')).sort().reverse()
       : []
-    pendingUploadMode = 'outro'
+    state.pendingUploadMode = 'outro'
     let msg2 = `🏁 *Modo: Subir SALIDA activado*\n\nEnvíame ahora el video de cierre/despedida (máx. 5 segundos).\nSe guardará con timestamp y se usará en todos los ensamblajes.\n\n`
     if (existing.length > 0) {
       msg2 += `📁 *Versiones guardadas (${existing.length}):*\n`
@@ -925,10 +923,10 @@ Empezamos con el FOTOGRAMA 1`
   if (text === '/subir_audio') {
     const audioDir = getAudioDir()
     const existing = fs.readdirSync(audioDir).filter(f => /\.(mp3|ogg|m4a|wav|aac|opus)$/i.test(f)).sort()
-    audioUploadCounter = existing.length > 0
+    state.audioUploadCounter = existing.length > 0
       ? Math.max(...existing.map(f => detectFrameNumber(f) || 0))
       : 0
-    pendingUploadMode = 'audio'
+    state.pendingUploadMode = 'audio'
     let msg2 = `🎤 *Modo: Subir AUDIO activado*\n\n` +
       `Envíame los audios de narración uno a uno.\n\n` +
       `*El bot detecta el fotograma automáticamente:*\n` +
@@ -954,7 +952,7 @@ Empezamos con el FOTOGRAMA 1`
       : []
     if (audioFiles.length === 0) {
       await bot.sendMessage(CHAT_ID,
-        `🎤 *Estado de Audios — ${TODAY}*\n\n` +
+        `🎤 *Estado de Audios — ${state.TODAY}*\n\n` +
         `❌ No tienes ningún audio cargado para hoy.\n` +
         `Usa */subir_audio* para empezar a subir los audios F1-F25.`,
         { parse_mode: 'Markdown' }
@@ -970,7 +968,7 @@ Empezamos con el FOTOGRAMA 1`
     const loaded = Object.keys(frameMap).map(Number).sort((a, b) => a - b)
     const missing = []
     for (let i = 1; i <= 25; i++) { if (!frameMap[i]) missing.push(i) }
-    let msg3 = `🎤 *Estado de Audios — ${TODAY}*\n\n`
+    let msg3 = `🎤 *Estado de Audios — ${state.TODAY}*\n\n`
     msg3 += `✅ *Cargados (${loaded.length}/25):* ${loaded.map(n => `F${n}`).join(', ')}\n`
     if (missing.length > 0) {
       msg3 += `❌ *Faltantes:* ${missing.map(n => `F${n}`).join(', ')}\n`
@@ -993,7 +991,7 @@ Empezamos con el FOTOGRAMA 1`
 
       // Buscar carpeta de hoy
       const folderSearch = await drive.files.list({
-        q: `'${process.env.GOOGLE_DRIVE_FOLDER_ID}' in parents and name='${TODAY}' and mimeType='application/vnd.google-apps.folder'`,
+        q: `'${process.env.GOOGLE_DRIVE_FOLDER_ID}' in parents and name='${state.TODAY}' and mimeType='application/vnd.google-apps.folder'`,
         fields: 'files(id,name)'
       })
       const dayFolder = folderSearch.data.files[0]
@@ -1024,7 +1022,7 @@ Empezamos con el FOTOGRAMA 1`
 
   // /subir_portada — Poner el bot en modo espera de imagen de portada de Copilot
   if (text === '/subir_portada') {
-    pendingUploadMode = 'portada'
+    state.pendingUploadMode = 'portada'
     await bot.sendMessage(CHAT_ID, `🖼️ *Modo: Subir PORTADA activado*\n\nEnvíame la imagen que generaste en Copilot (asegúrate de enviarla como FOTO/IMAGEN, no como archivo).\nReemplazará la portada generada automáticamente para los posts de hoy.`, { parse_mode: 'Markdown' })
     return
   }

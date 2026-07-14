@@ -78,40 +78,112 @@ async function publishReelToFacebook(videoPath, description) {
   return video_id
 }
 
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY;
+
+/**
+ * Obtiene el token de TikTok desde Supabase
+ */
+async function getTikTokToken() {
+  if (!SUPABASE_URL || !SUPABASE_KEY) throw new Error('Supabase no está configurado en el bot.');
+  const { data } = await axios.get(`${SUPABASE_URL}/rest/v1/platform_settings?platform=eq.tiktok&select=access_token,extra_config`, {
+    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
+  });
+  if (!data || data.length === 0) throw new Error('No se encontró configuración de TikTok en Supabase. Asegúrate de hacer el login primero.');
+  return data[0];
+}
+
+/**
+ * Renueva el token de TikTok usando el refresh_token
+ */
+async function refreshTikTokToken(refreshToken) {
+  const CLIENT_KEY = process.env.TIKTOK_CLIENT_KEY;
+  const CLIENT_SECRET = process.env.TIKTOK_CLIENT_SECRET;
+  if (!CLIENT_KEY || !CLIENT_SECRET) throw new Error('Faltan TIKTOK_CLIENT_KEY o TIKTOK_CLIENT_SECRET en .env.local');
+
+  const res = await axios.post('https://open.tiktokapis.com/v2/oauth/token/', {
+    client_key: CLIENT_KEY,
+    client_secret: CLIENT_SECRET,
+    grant_type: 'refresh_token',
+    refresh_token: refreshToken
+  }, { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
+
+  if (res.data.error) throw new Error(`TikTok refresh falló: ${res.data.error_description || res.data.error}`);
+
+  const newAccessToken = res.data.access_token;
+  const newRefreshToken = res.data.refresh_token;
+
+  // Actualizar en Supabase
+  await axios.patch(`${SUPABASE_URL}/rest/v1/platform_settings?platform=eq.tiktok`, {
+    access_token: newAccessToken,
+    extra_config: {
+      refresh_token: newRefreshToken,
+      token_expires_at: new Date(Date.now() + res.data.expires_in * 1000).toISOString(),
+      refresh_expires_at: new Date(Date.now() + res.data.refresh_expires_in * 1000).toISOString()
+    }
+  }, {
+    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' }
+  });
+
+  return newAccessToken;
+}
+
 /**
  * Sube un video a TikTok como BORRADOR (Draft).
  * Usa chunks de 128MB máximo, máximo 5 chunks totales.
  */
 async function publishToTikTok(videoPath, title) {
-  if (!TIKTOK_TOKEN) throw new Error('Token de TikTok no configurado')
+  let tokenData = await getTikTokToken();
+  let accessToken = tokenData.access_token;
+  
+  if (!accessToken) throw new Error('No hay access_token guardado en Supabase para TikTok.');
 
   const videoSize = fs.statSync(videoPath).size
-
-  // TikTok API exige que chunk_size sea entre 5MB y 64MB, y usar Math.floor para el conteo
   const chunkSize = 30 * 1024 * 1024; // 30 MB por chunk
   const totalChunks = Math.max(1, Math.floor(videoSize / chunkSize));
 
-  // 1. Init
-  const initRes = await axios.post(
-    'https://open.tiktokapis.com/v2/post/publish/inbox/video/init/',
-    {
-      source_info: {
-        source: 'FILE_UPLOAD',
-        video_size: videoSize,
-        chunk_size: chunkSize,
-        total_chunk_count: totalChunks
+  // Función envoltorio para intentar llamar a la API y refrescar si falla
+  async function callInitApi(token) {
+    const res = await axios.post(
+      'https://open.tiktokapis.com/v2/post/publish/inbox/video/init/',
+      {
+        source_info: {
+          source: 'FILE_UPLOAD',
+          video_size: videoSize,
+          chunk_size: chunkSize,
+          total_chunk_count: totalChunks
+        }
+      },
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        validateStatus: () => true // No lanzar excepcion automatica por HTTP status
       }
-    },
-    {
-      headers: {
-        'Authorization': `Bearer ${TIKTOK_TOKEN}`,
-        'Content-Type': 'application/json'
-      }
-    }
-  )
+    )
+    return res;
+  }
 
-  if (!initRes.data.data) {
-    throw new Error('TikTok init falló: ' + JSON.stringify(initRes.data))
+  let initRes = await callInitApi(accessToken);
+
+  // Detectar si el token expiró (TikTok devuelve 401 o un error json con access_token_invalid)
+  const isExpired = initRes.status === 401 || (initRes.data && initRes.data.error && (initRes.data.error.code === 'access_token_invalid' || initRes.data.error.code === 'unauthorized'));
+
+  if (isExpired) {
+    console.log('🔄 Token de TikTok expirado. Intentando renovarlo...');
+    if (!tokenData.extra_config || !tokenData.extra_config.refresh_token) {
+      throw new Error('Token de TikTok expirado y no hay refresh_token en Supabase para renovarlo. Debes iniciar sesión nuevamente.');
+    }
+    accessToken = await refreshTikTokToken(tokenData.extra_config.refresh_token);
+    console.log('✅ Token de TikTok renovado exitosamente.');
+    
+    // Reintentar
+    initRes = await callInitApi(accessToken);
+  }
+
+  if (initRes.status !== 200 || !initRes.data || !initRes.data.data) {
+    throw new Error('TikTok init falló: ' + JSON.stringify(initRes.data));
   }
 
   const { upload_url, publish_id } = initRes.data.data
@@ -120,7 +192,6 @@ async function publishToTikTok(videoPath, title) {
   const videoBuffer = fs.readFileSync(videoPath)
   for (let i = 0; i < totalChunks; i++) {
     const start = i * chunkSize
-    // El último chunk se lleva el resto de los bytes del archivo
     const end = (i === totalChunks - 1) ? videoSize - 1 : start + chunkSize - 1
     const chunk = videoBuffer.slice(start, end + 1)
     await axios.put(upload_url, chunk, {

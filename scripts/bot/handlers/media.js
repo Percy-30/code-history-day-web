@@ -11,8 +11,6 @@ const path = require('path')
 const publisher = require('../services/publisher.js')
 const { BOT_TOKEN, CHAT_ID, SUPABASE_URL, SUPABASE_KEY, SCENES_BASE_DIR, INTRO_DIR, OUTRO_DIR, LOGOS_DIR, BGM_DIR } = config
 
-let { TODAY, SCENES_DIR, sceneCounter, totalScenes, receivedScenes, downloadQueue, isDownloading, savedAudioScript, motorVozActivo, velocidadVozActiva, pendingUploadMode, audioUploadCounter, failedClips, cancelRequested } = state
-
 let globalBot = null;
 async function safeSend(text, opts = {}) {
   if (!globalBot) return;
@@ -45,10 +43,10 @@ module.exports = function registerMediaHandler(bot) {
     const isAudioFile = isAudio || (msg.document && /\.(mp3|ogg|m4a|wav|aac|opus)$/i.test(originalName))
 
     // IMPORTANTE: este bloque va PRIMERO, antes que el handler de audio F1-F25
-    if (isAudioFile && (pendingUploadMode === 'audio_completo' || isElevenLabsAudio)) {
-      pendingUploadMode = null // Limpiar modo siempre
+    if (isAudioFile && (state.pendingUploadMode === 'audio_completo' || isElevenLabsAudio)) {
+      state.pendingUploadMode = null // Limpiar modo siempre
       const ext = path.extname(originalName) || '.mp3'
-      const filePath = path.join(SCENES_DIR, `narracion_completa${ext}`)
+      const filePath = path.join(state.SCENES_DIR, `narracion_completa${ext}`)
 
       await bot.sendMessage(CHAT_ID,
         `📥 <b>Descargando narración completa...</b>\n` +
@@ -80,7 +78,7 @@ module.exports = function registerMediaHandler(bot) {
         }
 
         // Contar clips del día para calcular duración objetivo
-        const clipCount = fs.readdirSync(SCENES_DIR)
+        const clipCount = fs.readdirSync(state.SCENES_DIR)
           .filter(f => f.endsWith('.mp4') && !f.includes('final') && !f.includes('output') &&
                        !f.includes('proc_') && !f.includes('video_only') && !f.includes('master') &&
                        !f.includes('vertical') && !f.includes('horizontal') && !f.includes('cuadrado'))
@@ -111,9 +109,9 @@ module.exports = function registerMediaHandler(bot) {
 
 
     // ── Modo: Subir Música de fondo ───────────────────────────────────────────
-    if ((isAudio || (msg.document && /\.(mp3|ogg|m4a|wav|aac)$/i.test(originalName))) && pendingUploadMode && pendingUploadMode.startsWith('musica_')) {
-      const tag     = pendingUploadMode.replace('musica_', '')
-      pendingUploadMode = null
+    if ((isAudio || (msg.document && /\.(mp3|ogg|m4a|wav|aac)$/i.test(originalName))) && state.pendingUploadMode && state.pendingUploadMode.startsWith('musica_')) {
+      const tag     = state.pendingUploadMode.replace('musica_', '')
+      state.pendingUploadMode = null
       const musicDir = path.join(__dirname, '..', 'assets', 'audio', 'music')
       if (!fs.existsSync(musicDir)) fs.mkdirSync(musicDir, { recursive: true })
       const ext      = path.extname(originalName) || '.mp3'
@@ -151,14 +149,14 @@ module.exports = function registerMediaHandler(bot) {
 
 
     // ── Modo: Subir Video para Shorts ─────────────────────────────────────────
-    if (!isPhoto && mimeType && mimeType.includes('video') && pendingUploadMode === 'shorts_video') {
-      pendingUploadMode = null
+    if (!isPhoto && mimeType && mimeType.includes('video') && state.pendingUploadMode === 'shorts_video') {
+      state.pendingUploadMode = null
       await bot.sendMessage(CHAT_ID, '⬇️ Descargando tu video...')
       try {
         const fileInfo = await bot.getFile(fileId)
         const fileUrl  = 'https://api.telegram.org/file/bot' + BOT_TOKEN + '/' + fileInfo.file_path
         const response = await axios({ method: 'get', url: fileUrl, responseType: 'arraybuffer' })
-        const localPath = path.join(SCENES_DIR, 'input_shorts_' + TODAY + '.mp4')
+        const localPath = path.join(state.SCENES_DIR, 'input_shorts_' + state.TODAY + '.mp4')
         fs.writeFileSync(localPath, response.data)
         const sizeMB = (response.data.byteLength / 1024 / 1024).toFixed(1)
         await bot.sendMessage(CHAT_ID, '✅ Video recibido (' + sizeMB + ' MB). Procesando...')
@@ -170,13 +168,13 @@ module.exports = function registerMediaHandler(bot) {
     }
 
     // ── Modo: Subir Audio (narración F1-F25) ──────────────────────────────────
-    if ((isAudio || (msg.document && /\.(mp3|ogg|m4a|wav|aac|opus)$/i.test(originalName))) && pendingUploadMode === 'audio') {
+    if ((isAudio || (msg.document && /\.(mp3|ogg|m4a|wav|aac|opus)$/i.test(originalName))) && state.pendingUploadMode === 'audio') {
       const audioDir = getAudioDir()
       // Detectar número de frame
       let frameNum = detectFrameNumber(originalName)
       if (!frameNum) {
-        audioUploadCounter++
-        frameNum = audioUploadCounter
+        state.audioUploadCounter++
+        frameNum = state.audioUploadCounter
       }
       const ext = path.extname(originalName) || (mimeType.includes('ogg') ? '.ogg' : '.mp3')
       const filename = `audio_F${String(frameNum).padStart(2, '0')}${ext}`
@@ -211,10 +209,10 @@ module.exports = function registerMediaHandler(bot) {
     }
 
     // ── Modo: Subir Portada ───────────────────────────────────────────────
-    if (isPhoto && pendingUploadMode === 'portada') {
-      pendingUploadMode = null // Limpiar modo
-      const filename = `ephemeris_${TODAY}.jpg`
-      const filePath = path.join(SCENES_DIR, filename)
+    if (isPhoto && state.pendingUploadMode === 'portada') {
+      state.pendingUploadMode = null // Limpiar modo
+      const filename = `ephemeris_${state.TODAY}.jpg`
+      const filePath = path.join(state.SCENES_DIR, filename)
 
       await bot.sendMessage(CHAT_ID, `📥 Descargando la portada de Copilot...`, { parse_mode: 'Markdown' })
 
@@ -230,7 +228,7 @@ module.exports = function registerMediaHandler(bot) {
         
         try {
           await bot.sendMessage(CHAT_ID, `☁️ Subiendo portada a Google Drive para respaldo...`)
-          await uploadToGoogleDrive(filePath, `ephemeris-copilot-${TODAY}.jpg`, 'image/jpeg', TODAY)
+          await uploadToGoogleDrive(filePath, `ephemeris-copilot-${state.TODAY}.jpg`, 'image/jpeg', state.TODAY)
           await bot.sendMessage(CHAT_ID, `✅ Portada respaldada en Google Drive.`)
         } catch (e) {
           log('⚠️', `No se pudo respaldar la portada en Drive: ${e.message}`)
@@ -243,16 +241,16 @@ module.exports = function registerMediaHandler(bot) {
     }
 
     if (isPhoto) {
-      if (pendingUploadMode !== 'portada') {
+      if (state.pendingUploadMode !== 'portada') {
         await bot.sendMessage(CHAT_ID, `⚠️ Recibí una imagen pero no estoy en modo portada. Escribe /subir_portada primero si quieres guardarla como portada de hoy.`)
       }
       return
     }
 
     // ── Modo: Subir intro o salida ────────────────────────────────────────
-    if (pendingUploadMode === 'intro' || pendingUploadMode === 'outro') {
-      const mode = pendingUploadMode
-      pendingUploadMode = null // Limpiar modo
+    if (state.pendingUploadMode === 'intro' || state.pendingUploadMode === 'outro') {
+      const mode = state.pendingUploadMode
+      state.pendingUploadMode = null // Limpiar modo
 
       const targetDir = mode === 'intro' ? INTRO_DIR : OUTRO_DIR
       const label     = mode === 'intro' ? 'INTRO' : 'SALIDA'
@@ -282,7 +280,7 @@ module.exports = function registerMediaHandler(bot) {
       } catch (err) {
         log('❌', `Error descargando ${label}: ${err.message}`)
         await bot.sendMessage(CHAT_ID, `❌ Error al guardar el video de ${label}: ${err.message}`)
-        pendingUploadMode = null
+        state.pendingUploadMode = null
       }
       return
     }
@@ -300,14 +298,14 @@ module.exports = function registerMediaHandler(bot) {
       return
     }
 
-    sceneCounter++
-    const clipNum  = sceneCounter
-    const filename = `${TODAY}_escena_${String(clipNum).padStart(2,'0')}.mp4`
-    const filePath = path.join(SCENES_DIR, filename)
+    state.sceneCounter++
+    const clipNum  = state.sceneCounter
+    const filename = `${state.TODAY}_escena_${String(clipNum).padStart(2,'0')}.mp4`
+    const filePath = path.join(state.SCENES_DIR, filename)
 
     // Agregar a la cola y procesar secuencialmente (evita timeouts en masa)
-    downloadQueue.push({ fileId, clipNum, filename, filePath })
-    if (!isDownloading) processDownloadQueue()
+    state.downloadQueue.push({ fileId, clipNum, filename, filePath })
+    if (!state.isDownloading) processDownloadQueue()
     return
   }
   });

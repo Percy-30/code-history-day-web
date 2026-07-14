@@ -11,8 +11,6 @@ const path = require('path')
 const publisher = require('../services/publisher.js')
 const { BOT_TOKEN, CHAT_ID, SUPABASE_URL, SUPABASE_KEY, SCENES_BASE_DIR, INTRO_DIR, OUTRO_DIR, LOGOS_DIR, BGM_DIR } = config
 
-let { TODAY, SCENES_DIR, sceneCounter, totalScenes, receivedScenes, downloadQueue, isDownloading, savedAudioScript, motorVozActivo, velocidadVozActiva, pendingUploadMode, audioUploadCounter, failedClips, cancelRequested } = state
-
 let globalBot = null;
 async function safeSend(text, opts = {}) {
   if (!globalBot) return;
@@ -52,8 +50,8 @@ module.exports = function registerCallbacks(bot) {
       await bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: chatId, message_id: messageId });
       await bot.sendMessage(chatId, '🚀 Publicando el Post Gráfico en Facebook...');
       try {
-        const imgPath = path.join(SCENES_DIR, `ephemeris_${TODAY}.jpg`);
-        const txtPath = path.join(SCENES_DIR, `post_text_${TODAY}.txt`);
+        const imgPath = path.join(state.SCENES_DIR, `ephemeris_${state.TODAY}.jpg`);
+        const txtPath = path.join(state.SCENES_DIR, `post_text_${state.TODAY}.txt`);
 
         if (!fs.existsSync(imgPath) || !fs.existsSync(txtPath)) {
           throw new Error('No se encontraron los archivos locales descargados.');
@@ -99,7 +97,7 @@ module.exports = function registerCallbacks(bot) {
     // Regenerar publicación
     if (data === 'regenerate_post') {
       await bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: chatId, message_id: messageId });
-      const txtPath = path.join(SCENES_DIR, `post_text_${TODAY}.txt`);
+      const txtPath = path.join(state.SCENES_DIR, `post_text_${state.TODAY}.txt`);
       try {
         if (fs.existsSync(txtPath)) {
           fs.unlinkSync(txtPath);
@@ -129,12 +127,12 @@ module.exports = function registerCallbacks(bot) {
         // Cargar descripción corta
         let postText = 'CodeHistory Daily - Efeméride tecnológica del día \n\n▶️ youtube.com/@CodeHistoryDaily\n🎵 tiktok.com/@codehistorydaily\n📱 facebook.com/CodeHistoryDaily\n\n#CodeHistoryDaily #ATPDev #Tecnologia'
         try {
-          const txtPath = path.join(SCENES_DIR, 'post_text_' + TODAY + '.txt')
+          const txtPath = path.join(state.SCENES_DIR, 'post_text_' + state.TODAY + '.txt')
           if (fs.existsSync(txtPath)) postText = fs.readFileSync(txtPath, 'utf8')
         } catch (_) { }
 
         // Estado de publicaciones
-        const pubStatePath = path.join(SCENES_DIR, 'pub_status_' + TODAY + '.json')
+        const pubStatePath = path.join(state.SCENES_DIR, 'pub_status_' + state.TODAY + '.json')
         let pubStatus = { tiktok: false, facebook_reel: false, youtube_short: false, youtube_video: false, facebook_video: false }
         if (fs.existsSync(pubStatePath)) {
           try { const old = JSON.parse(fs.readFileSync(pubStatePath, 'utf8')); Object.assign(pubStatus, old) } catch (_) { }
@@ -237,8 +235,8 @@ module.exports = function registerCallbacks(bot) {
       // Leer descripción SEO o generar si no existe
       let longDesc = ''
       try {
-        const ytDescPath = path.join(path.dirname(horizPath), 'yt_description_' + TODAY + '.txt')
-        const postTxtPath = path.join(path.dirname(horizPath), 'post_text_' + TODAY + '.txt')
+        const ytDescPath = path.join(path.dirname(horizPath), 'yt_description_' + state.TODAY + '.txt')
+        const postTxtPath = path.join(path.dirname(horizPath), 'post_text_' + state.TODAY + '.txt')
         const narrationPath = path.join(path.dirname(horizPath), 'narration_full.txt')
         if (fs.existsSync(ytDescPath)) {
           longDesc = fs.readFileSync(ytDescPath, 'utf8')
@@ -327,13 +325,13 @@ module.exports = function registerCallbacks(bot) {
           dd + '-' + mm + '-' + yyyy,
           yyyy + '-' + mm + '-' + dd,
           dd + '_' + mm + '_' + yyyy,
-          TODAY
+          state.TODAY
         ]
 
         // Buscar la carpeta del día actual
         const rootId = process.env.GOOGLE_DRIVE_FOLDER_ID
         const folderSearch = await drive.files.list({
-          q: `'${rootId}' in parents and name='${TODAY}' and mimeType='application/vnd.google-apps.folder'`,
+          q: `'${rootId}' in parents and name='${state.TODAY}' and mimeType='application/vnd.google-apps.folder'`,
           fields: 'files(id,name)'
         })
         const dayFolder = folderSearch.data.files[0]
@@ -348,9 +346,13 @@ module.exports = function registerCallbacks(bot) {
               pageSize: 10
             })
             if (res.data.files && res.data.files.length > 0) {
-              // Preferir el más grande (video completo)
-              foundFile = res.data.files.sort((a, b) => Number(b.size || 0) - Number(a.size || 0))[0]
-              break
+              // Filtrar estrictamente archivos de video (ignorar portadas png/jpg)
+              const videoFiles = res.data.files.filter(f => f.mimeType.includes('video') || f.name.toLowerCase().endsWith('.mp4') || f.name.toLowerCase().endsWith('.mov'))
+              if (videoFiles.length > 0) {
+                // Preferir el más grande (video completo)
+                foundFile = videoFiles.sort((a, b) => Number(b.size || 0) - Number(a.size || 0))[0]
+                break
+              }
             }
           }
         }
@@ -358,9 +360,9 @@ module.exports = function registerCallbacks(bot) {
         if (!foundFile) {
           let debugMsg = `❌ No encontré ningún video MP4 de hoy en Drive.\n\n`
           if (!dayFolder) {
-            debugMsg += `⚠️ No se encontró la carpeta del día (\`${TODAY}\`) en Drive.\n`
+            debugMsg += `⚠️ No se encontró la carpeta del día (\`${state.TODAY}\`) en Drive.\n`
           } else {
-            debugMsg += `📂 Busqué en la carpeta \`${TODAY}\` los patrones: ${datePatterns.join(', ')}\n`
+            debugMsg += `📂 Busqué en la carpeta \`${state.TODAY}\` los patrones: ${datePatterns.join(', ')}\n`
           }
           await bot.sendMessage(chatId,
             debugMsg + '\nSube el archivo MP4 a la carpeta de hoy en Drive y vuelve a intentarlo, o envíame el video manualmente.',
@@ -392,7 +394,7 @@ module.exports = function registerCallbacks(bot) {
         const realMimeType = fileMeta.data.mimeType
         await bot.sendMessage(chatId, '📄 Tipo de archivo: ' + realMimeType)
 
-        const localPath = path.join(SCENES_DIR, 'input_shorts_' + TODAY + '.mp4')
+        const localPath = path.join(state.SCENES_DIR, 'input_shorts_' + state.TODAY + '.mp4')
         const dest = require('fs').createWriteStream(localPath)
 
         let dlRes
@@ -473,7 +475,7 @@ module.exports = function registerCallbacks(bot) {
     // Shorts upload manual — activar modo espera
     if (data === 'shorts_manual_upload') {
       await bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: chatId, message_id: messageId })
-      pendingUploadMode = 'shorts_video'
+      state.pendingUploadMode = 'shorts_video'
       await bot.sendMessage(chatId,
         '📤 *Modo: Subir video para Shorts activado*\n\nEnvíame ahora el video (MP4, MOV, etc.).',
         { parse_mode: 'Markdown' }
@@ -523,35 +525,35 @@ module.exports = function registerCallbacks(bot) {
           ]
         }
       }
-      await bot.sendMessage(CHAT_ID, `🗣️ *Selecciona la voz para el video:*\n\n_(Motor actual: ${motorVozActivo})_`, { parse_mode: 'Markdown', ...opts })
+      await bot.sendMessage(CHAT_ID, `🗣️ *Selecciona la voz para el video:*\n\n_(Motor actual: ${state.motorVozActivo})_`, { parse_mode: 'Markdown', ...opts })
       return
     }
 
     // Selección de voz desde el resumen pre-ensamblaje (regresa al resumen con voz actualizada)
     if (data.startsWith('voicepre_')) {
       const selectedVoice = data.replace('voicepre_', '')
-      motorVozActivo = selectedVoice
-      await bot.answerCallbackQuery(callbackQuery.id, { text: `✅ Voz: ${motorVozActivo}` })
+      state.motorVozActivo = selectedVoice
+      await bot.answerCallbackQuery(callbackQuery.id, { text: `✅ Voz: ${state.motorVozActivo}` })
 
       // Limpiar audios TTS previos para regenerar con la nueva voz
-      const oldTTS = fs.readdirSync(SCENES_DIR).filter(f => f.startsWith('voiceover_') && f.endsWith('.mp3'))
-      oldTTS.forEach(f => { try { fs.unlinkSync(path.join(SCENES_DIR, f)) } catch (_) { } })
+      const oldTTS = fs.readdirSync(state.SCENES_DIR).filter(f => f.startsWith('voiceover_') && f.endsWith('.mp3'))
+      oldTTS.forEach(f => { try { fs.unlinkSync(path.join(state.SCENES_DIR, f)) } catch (_) { } })
 
-      const existingClips = fs.readdirSync(SCENES_DIR).filter(f => f.endsWith('.mp4') && !f.includes('final') && !f.includes('output') && !f.includes('proc_'))
+      const existingClips = fs.readdirSync(state.SCENES_DIR).filter(f => f.endsWith('.mp4') && !f.includes('final') && !f.includes('output') && !f.includes('proc_'))
       const introFiles = fs.existsSync(INTRO_DIR) ? fs.readdirSync(INTRO_DIR).filter(f => f.endsWith('.mp4')).sort().reverse() : []
       const outroFiles = fs.existsSync(OUTRO_DIR) ? fs.readdirSync(OUTRO_DIR).filter(f => f.endsWith('.mp4')).sort().reverse() : []
-      const hasScript = fs.existsSync(path.join(SCENES_DIR, 'script.json'))
+      const hasScript = fs.existsSync(path.join(state.SCENES_DIR, 'script.json'))
       const audioDir = getAudioDir()
       const uploadedAudios = fs.existsSync(audioDir)
         ? fs.readdirSync(audioDir).filter(f => /\.(mp3|ogg|m4a|wav|aac|opus)$/i.test(f)).length : 0
-      const audioStatus = uploadedAudios > 0 ? `✅ ${uploadedAudios} audios subidos manualmente` : (hasScript ? `✅ TTS con ${motorVozActivo}` : `⚠️ Sin guion`)
+      const audioStatus = uploadedAudios > 0 ? `✅ ${uploadedAudios} audios subidos manualmente` : (hasScript ? `✅ TTS con ${state.motorVozActivo}` : `⚠️ Sin guion`)
 
       const opts = {
         parse_mode: 'Markdown',
         reply_markup: {
           inline_keyboard: [
             [
-              { text: `🗣️ Cambiar voz (actual: ${motorVozActivo.replace('es-MX-', '').replace('es-ES-', '').replace('Neural', '')})`, callback_data: 'pre_ensamble_voz' }
+              { text: `🗣️ Cambiar voz (actual: ${state.motorVozActivo.replace('es-MX-', '').replace('es-ES-', '').replace('Neural', '')})`, callback_data: 'pre_ensamble_voz' }
             ],
             [
               { text: '🎬 ¡Ensamblar con esta voz!', callback_data: 'confirm_ensamble' },
@@ -561,10 +563,10 @@ module.exports = function registerCallbacks(bot) {
         }
       }
       await bot.sendMessage(CHAT_ID,
-        `✅ *Voz actualizada a: ${motorVozActivo}*\n${oldTTS.length > 0 ? `🔄 Se borraron ${oldTTS.length} audios TTS anteriores para regenerar con la nueva voz.\n` : ''}\n` +
+        `✅ *Voz actualizada a: ${state.motorVozActivo}*\n${oldTTS.length > 0 ? `🔄 Se borraron ${oldTTS.length} audios TTS anteriores para regenerar con la nueva voz.\n` : ''}\n` +
         `🎬 *Resumen listo para ensamblar:*\n\n` +
         `🎥 Clips: *${existingClips.length}*\n` +
-        `🗣️ Voz TTS: *${motorVozActivo}*\n` +
+        `🗣️ Voz TTS: *${state.motorVozActivo}*\n` +
         `📢 Audio: ${audioStatus}\n` +
         `🎬 Intro: ${introFiles.length > 0 ? `✅ \`${introFiles[0]}\`` : '⚠️ Sin intro'}\n` +
         `🏁 Salida: ${outroFiles.length > 0 ? `✅ \`${outroFiles[0]}\`` : '⚠️ Sin salida'}\n\n` +
@@ -577,14 +579,14 @@ module.exports = function registerCallbacks(bot) {
     // Volver al resumen (sin cambiar voz)
     if (data === 'back_to_resumen') {
       await bot.answerCallbackQuery(callbackQuery.id)
-      const existingClips = fs.readdirSync(SCENES_DIR).filter(f => f.endsWith('.mp4') && !f.includes('final') && !f.includes('output') && !f.includes('proc_'))
+      const existingClips = fs.readdirSync(state.SCENES_DIR).filter(f => f.endsWith('.mp4') && !f.includes('final') && !f.includes('output') && !f.includes('proc_'))
       const introFiles = fs.existsSync(INTRO_DIR) ? fs.readdirSync(INTRO_DIR).filter(f => f.endsWith('.mp4')).sort().reverse() : []
       const outroFiles = fs.existsSync(OUTRO_DIR) ? fs.readdirSync(OUTRO_DIR).filter(f => f.endsWith('.mp4')).sort().reverse() : []
-      const hasScript = fs.existsSync(path.join(SCENES_DIR, 'script.json'))
+      const hasScript = fs.existsSync(path.join(state.SCENES_DIR, 'script.json'))
       const audioDir = getAudioDir()
       const uploadedAudios = fs.existsSync(audioDir)
         ? fs.readdirSync(audioDir).filter(f => /\.(mp3|ogg|m4a|wav|aac|opus)$/i.test(f)).length : 0
-      const ttsAudios = fs.readdirSync(SCENES_DIR).filter(f => f.startsWith('voiceover_') && f.endsWith('.mp3')).length
+      const ttsAudios = fs.readdirSync(state.SCENES_DIR).filter(f => f.startsWith('voiceover_') && f.endsWith('.mp3')).length
       const totalAudios = uploadedAudios + ttsAudios
       const audioStatus = totalAudios > 0
         ? `✅ ${totalAudios} audios (${uploadedAudios} subidos + ${ttsAudios} TTS)`
@@ -594,7 +596,7 @@ module.exports = function registerCallbacks(bot) {
         reply_markup: {
           inline_keyboard: [
             [
-              { text: `🗣️ Cambiar voz (actual: ${motorVozActivo.replace('es-MX-', '').replace('es-ES-', '').replace('Neural', '')})`, callback_data: 'pre_ensamble_voz' }
+              { text: `🗣️ Cambiar voz (actual: ${state.motorVozActivo.replace('es-MX-', '').replace('es-ES-', '').replace('Neural', '')})`, callback_data: 'pre_ensamble_voz' }
             ],
             [
               { text: '🎬 ¡Ensamblar con esta voz!', callback_data: 'confirm_ensamble' },
@@ -606,7 +608,7 @@ module.exports = function registerCallbacks(bot) {
       await bot.sendMessage(CHAT_ID,
         `🎬 *Resumen antes de ensamblar:*\n\n` +
         `🎥 Clips: *${existingClips.length}*\n` +
-        `🗣️ Voz TTS: *${motorVozActivo}*\n` +
+        `🗣️ Voz TTS: *${state.motorVozActivo}*\n` +
         `🎙️ Guion/Audios: ${hasScript ? `✅ script.json cargado` : (totalAudios > 0 ? `✅ audios subidos` : `⚠️ Sin guion`)}\n` +
         `📢 Estado audio: ${audioStatus}\n` +
         `🎬 Intro: ${introFiles.length > 0 ? `✅ \`${introFiles[0]}\`` : '⚠️ Sin intro'}\n` +
@@ -626,9 +628,9 @@ module.exports = function registerCallbacks(bot) {
         return;
       }
 
-      motorVozActivo = selectedVoice;
-      await bot.answerCallbackQuery(callbackQuery.id, { text: `✅ Voz cambiada a: ${motorVozActivo}` });
-      await bot.sendMessage(CHAT_ID, `✅ Voz actualizada a: *${motorVozActivo}*`, { parse_mode: 'Markdown' });
+      state.motorVozActivo = selectedVoice;
+      await bot.answerCallbackQuery(callbackQuery.id, { text: `✅ Voz cambiada a: ${state.motorVozActivo}` });
+      await bot.sendMessage(CHAT_ID, `✅ Voz actualizada a: *${state.motorVozActivo}*`, { parse_mode: 'Markdown' });
     }
 
     // ── Eliminar intro por índice ──────────────────────────────────────────────
@@ -680,16 +682,16 @@ module.exports = function registerCallbacks(bot) {
 
   // ── Cola de descargas secuenciales (1 a 1) ──────────────────────────
   async function processDownloadQueue() {
-    if (isDownloading || downloadQueue.length === 0) return
-    isDownloading = true
+    if (state.isDownloading || state.downloadQueue.length === 0) return
+    state.isDownloading = true
 
-    while (downloadQueue.length > 0) {
-      if (cancelRequested) {
+    while (state.downloadQueue.length > 0) {
+      if (state.cancelRequested) {
         log('🛑', 'Descarga cancelada')
-        await bot.sendMessage(CHAT_ID, '🛑 Descarga cancelada. ' + receivedScenes.length + ' clips guardados.')
-        cancelRequested = false; isDownloading = false; return
+        await bot.sendMessage(CHAT_ID, '🛑 Descarga cancelada. ' + state.receivedScenes.length + ' clips guardados.')
+        state.cancelRequested = false; state.isDownloading = false; return
       }
-      const { fileId, clipNum, filename, filePath } = downloadQueue.shift()
+      const { fileId, clipNum, filename, filePath } = state.downloadQueue.shift()
       let success = false
 
       // Intentar hasta 3 veces
@@ -699,15 +701,15 @@ module.exports = function registerCallbacks(bot) {
           const fileUrl = await bot.getFileLink(fileId)
           const resp = await axios.get(fileUrl, { responseType: 'arraybuffer', timeout: 60000 })
           fs.writeFileSync(filePath, resp.data)
-          receivedScenes.push(filePath)
+          state.receivedScenes.push(filePath)
           const sizekB = Math.round(resp.data.byteLength / 1024)
           log('✅', `Clip #${clipNum} guardado: ${filename} (${sizekB} KB)`)
 
-          const pendientes = totalScenes > 0 ? totalScenes - clipNum : '?'
+          const pendientes = state.totalScenes > 0 ? state.totalScenes - clipNum : '?'
           await bot.sendMessage(CHAT_ID,
             `✅ *Clip #${clipNum} guardado* → \`${filename}\` (${sizekB} KB)\n` +
-            (totalScenes > 0
-              ? (clipNum >= totalScenes
+            (state.totalScenes > 0
+              ? (clipNum >= state.totalScenes
                 ? `🎬 ¡Eso es todo! Escribe *listo* para armar el video final.`
                 : `📬 Faltan *${pendientes}* clip(s) más.`)
               : `📬 Sigue enviando. Cuando termines escribe *listo*.`),
@@ -723,7 +725,7 @@ module.exports = function registerCallbacks(bot) {
 
       if (!success) {
         log('❌', `Clip #${clipNum} falló 3 veces, omitido.`)
-        failedClips.push(clipNum) // 📌 Registrar para el reporte final
+        state.failedClips.push(clipNum) // 📌 Registrar para el reporte final
         await bot.sendMessage(CHAT_ID,
           `⚠️ Clip #${clipNum} falló 3 veces. Lo anoto para avisarte al final.`,
           { parse_mode: 'Markdown' }
@@ -733,20 +735,20 @@ module.exports = function registerCallbacks(bot) {
       await new Promise(r => setTimeout(r, 500))
     }
 
-    isDownloading = false
+    state.isDownloading = false
 
     // 📌 Reporte final cuando la cola se vacía
-    if (failedClips.length > 0) {
+    if (state.failedClips.length > 0) {
       await bot.sendMessage(CHAT_ID,
-        `⚠️ *Descarga terminada con ${failedClips.length} error(es)*\n\n` +
+        `⚠️ *Descarga terminada con ${state.failedClips.length} error(es)*\n\n` +
         `Los siguientes clips no se pudieron bajar. Por favor reenvíamelos de nuevo:\n\n` +
-        failedClips.map(n => `• Video #${n}`).join('\n') +
+        state.failedClips.map(n => `• Video #${n}`).join('\n') +
         `\n\n💡 Envíamelos uno por uno y el bot los agregará automáticamente al lote.`,
         { parse_mode: 'Markdown' }
       )
-    } else if (downloadQueue.length === 0 && receivedScenes.length > 0) {
+    } else if (state.downloadQueue.length === 0 && state.receivedScenes.length > 0) {
       await bot.sendMessage(CHAT_ID,
-        `✅ *¡Todos los ${receivedScenes.length} clips descargados correctamente!*\n` +
+        `✅ *¡Todos los ${state.receivedScenes.length} clips descargados correctamente!*\n` +
         `Escribe *listo* para ensamblar el video final.`,
         { parse_mode: 'Markdown' }
       )
@@ -767,7 +769,7 @@ module.exports = function registerCallbacks(bot) {
       if (specificDate) {
         await bot.sendMessage(CHAT_ID, `🔍 Buscando escenas para la fecha *${specificDate}*...`, { parse_mode: 'Markdown' })
         queryUrl = `${SUPABASE_URL}/rest/v1/daily_content?date=eq.${specificDate}&limit=1`
-        TODAY = specificDate // Actualizamos el estado para que los videos se guarden con esta fecha
+        state.TODAY = specificDate // Actualizamos el estado para que los videos se guarden con esta fecha
       } else {
         await bot.sendMessage(CHAT_ID, `🔍 Buscando la efeméride *más reciente* generada...`, { parse_mode: 'Markdown' })
       }
@@ -784,14 +786,14 @@ module.exports = function registerCallbacks(bot) {
 
       const ephemeris = data[0]
 
-      // Si buscamos la más reciente, actualizamos TODAY a la fecha encontrada
+      // Si buscamos la más reciente, actualizamos state.TODAY a la fecha encontrada
       if (!specificDate) {
-        TODAY = ephemeris.date
+        state.TODAY = ephemeris.date
       } else {
-        TODAY = specificDate
+        state.TODAY = specificDate
       }
-      SCENES_DIR = path.join(SCENES_BASE_DIR, TODAY);
-      if (!fs.existsSync(SCENES_DIR)) fs.mkdirSync(SCENES_DIR, { recursive: true });
+      state.SCENES_DIR = path.join(SCENES_BASE_DIR, state.TODAY);
+      if (!fs.existsSync(state.SCENES_DIR)) fs.mkdirSync(state.SCENES_DIR, { recursive: true });
 
       const scenes = ephemeris.scenes || []
 
@@ -828,10 +830,10 @@ module.exports = function registerCallbacks(bot) {
         }
       })
 
-      totalScenes = allFrames.length
+      state.totalScenes = allFrames.length
       await bot.sendMessage(CHAT_ID,
         `✅ *Efeméride encontrada (${ephemeris.date}):*\n"${ephemeris.ephemeris_text.substring(0, 100)}..."\n\n` +
-        `🎬 Tengo *${totalScenes} fotogramas* para animar (en ${scenes.length} escenas).\n` +
+        `🎬 Tengo *${state.totalScenes} fotogramas* para animar (en ${scenes.length} escenas).\n` +
         `📌 Te las envío una por una. Para cada una:\n` +
         `  1️⃣ Reenvía la imagen a *Meta AI* en WhatsApp\n` +
         `  2️⃣ Pega el prompt de texto junto a la imagen\n` +
@@ -856,7 +858,7 @@ module.exports = function registerCallbacks(bot) {
         if (frameItem.imageUrl) {
           // Descargar la imagen localmente antes de enviar a Telegram
           // (Telegram no puede acceder directamente a URLs de Pollinations)
-          const tempImgPath = path.join(SCENES_DIR, `temp_frame_${i + 1}.jpg`)
+          const tempImgPath = path.join(state.SCENES_DIR, `temp_frame_${i + 1}.jpg`)
           let imgDownloaded = false;
 
           // Intentar hasta 3 veces si Pollinations tarda mucho en responder
@@ -897,7 +899,7 @@ module.exports = function registerCallbacks(bot) {
       }
 
       await bot.sendMessage(CHAT_ID,
-        `✅ ¡Listo! Te envié las *${totalScenes} escenas*.\n` +
+        `✅ ¡Listo! Te envié las *${state.totalScenes} escenas*.\n` +
         `Cuando hayas generado todos los videos con Meta AI y me los hayas reenviado, escribe: *listo*`,
         { parse_mode: 'Markdown' }
       )
@@ -967,15 +969,15 @@ module.exports = function registerCallbacks(bot) {
 
       // 2. Portada del día: buscar ephemeris*.jpg en la carpeta de scenes del día
       let portadaPath = null
-      const ephFiles = fs.readdirSync(SCENES_DIR).filter(f => f.startsWith('ephemeris') && /\.(jpg|jpeg|png)$/i.test(f))
-      if (ephFiles.length > 0) portadaPath = path.join(SCENES_DIR, ephFiles[0])
+      const ephFiles = fs.readdirSync(state.SCENES_DIR).filter(f => f.startsWith('ephemeris') && /\.(jpg|jpeg|png)$/i.test(f))
+      if (ephFiles.length > 0) portadaPath = path.join(state.SCENES_DIR, ephFiles[0])
 
       // 3. Outro más reciente
       const outroFiles = fs.existsSync(OUTRO_DIR) ? fs.readdirSync(OUTRO_DIR).filter(f => f.endsWith('.mp4')).sort().reverse() : []
       const outroSrc = outroFiles.length > 0 ? path.join(OUTRO_DIR, outroFiles[0]) : null
 
-      const outputDir = SCENES_DIR
-      const finalPath = path.join(outputDir, TODAY + '_shorts_final.mp4')
+      const outputDir = state.SCENES_DIR
+      const finalPath = path.join(outputDir, state.TODAY + '_shorts_final.mp4')
       const processedDir = path.join(outputDir, 'proc_shorts')
       if (!fs.existsSync(processedDir)) fs.mkdirSync(processedDir, { recursive: true })
 
@@ -1009,7 +1011,7 @@ module.exports = function registerCallbacks(bot) {
       }
 
       // 5. Normalizar el video principal a 1080x1920 + logo + bgm
-      const bgmPath = path.join(SCENES_DIR, 'bgm_active.mp3')
+      const bgmPath = path.join(state.SCENES_DIR, 'bgm_active.mp3')
       const hasBgm = fs.existsSync(bgmPath)
       const mainNorm = path.join(processedDir, 'main_norm.mp4')
       
@@ -1107,14 +1109,14 @@ module.exports = function registerCallbacks(bot) {
       // 8. Subir a Drive
       try {
         await safeSend('☁️ Subiendo a Google Drive...')
-        const url = await uploadToGoogleDrive(finalPath, TODAY + '_shorts_processed.mp4')
+        const url = await uploadToGoogleDrive(finalPath, state.TODAY + '_shorts_processed.mp4')
         await safeSend('✅ Subido a Drive: ' + url, { disable_web_page_preview: true })
       } catch (e) { await safeSend('⚠️ No se pudo subir a Drive: ' + e.message) }
 
       // 9. Previsualizar post y preguntar si publicar
       let postTextPreview = 'Sin descripción disponible. Usa /publicar_post si necesitas que la IA lo redacte.'
       try {
-        const txtPath = path.join(SCENES_DIR, `post_text_${TODAY}.txt`)
+        const txtPath = path.join(state.SCENES_DIR, `post_text_${state.TODAY}.txt`)
         if (fs.existsSync(txtPath)) {
           postTextPreview = fs.readFileSync(txtPath, 'utf8').substring(0, 300)
         }
@@ -1160,13 +1162,13 @@ module.exports = function registerCallbacks(bot) {
       ffmpeg.setFfmpegPath(ffmpegPath)
       const { spawnSync, execFileSync } = require('child_process')
 
-      const outputPath = path.join(SCENES_DIR, TODAY + '_final.mp4')
-      const processedDir = path.join(SCENES_DIR, 'processed')
-      const normalizedDir = path.join(SCENES_DIR, 'normalized')
+      const outputPath = path.join(state.SCENES_DIR, state.TODAY + '_final.mp4')
+      const processedDir = path.join(state.SCENES_DIR, 'processed')
+      const normalizedDir = path.join(state.SCENES_DIR, 'normalized')
       if (!fs.existsSync(processedDir)) fs.mkdirSync(processedDir, { recursive: true })
       if (!fs.existsSync(normalizedDir)) fs.mkdirSync(normalizedDir, { recursive: true })
 
-      const allFiles = fs.readdirSync(SCENES_DIR)
+      const allFiles = fs.readdirSync(state.SCENES_DIR)
         .filter(f => f.endsWith('.mp4') &&
           !f.includes('final') && !f.includes('output') && !f.includes('proc_') &&
           !f.includes('video_only') && !f.includes('master') && !f.includes('vertical') &&
@@ -1177,7 +1179,7 @@ module.exports = function registerCallbacks(bot) {
         await safeSend('⚠️ No encontré ningún clip MP4. Reenvíame los videos primero.')
         return
       }
-      const clipPaths = allFiles.map(f => path.join(SCENES_DIR, f))
+      const clipPaths = allFiles.map(f => path.join(state.SCENES_DIR, f))
 
       const introFiles = fs.existsSync(INTRO_DIR) ? fs.readdirSync(INTRO_DIR).filter(f => f.endsWith('.mp4')).sort().reverse() : []
       const outroFiles = fs.existsSync(OUTRO_DIR) ? fs.readdirSync(OUTRO_DIR).filter(f => f.endsWith('.mp4')).sort().reverse() : []
@@ -1193,7 +1195,7 @@ module.exports = function registerCallbacks(bot) {
       )
 
       let framesData = []
-      const scriptJsonPath = path.join(SCENES_DIR, 'script.json')
+      const scriptJsonPath = path.join(state.SCENES_DIR, 'script.json')
       if (fs.existsSync(scriptJsonPath)) {
         framesData = JSON.parse(fs.readFileSync(scriptJsonPath, 'utf8'))
       }
@@ -1217,7 +1219,7 @@ module.exports = function registerCallbacks(bot) {
 
       // BGM con contexto de efeméride
       let ephemerisContext = ''
-      const audioTxtPath = path.join(SCENES_DIR, '01_guion_audio_' + TODAY + '.txt')
+      const audioTxtPath = path.join(state.SCENES_DIR, '01_guion_audio_' + state.TODAY + '.txt')
       if (fs.existsSync(audioTxtPath)) {
         ephemerisContext = fs.readFileSync(audioTxtPath, 'utf8').substring(0, 3000)
       }
@@ -1282,8 +1284,8 @@ module.exports = function registerCallbacks(bot) {
         const frameNum = i + 1
         const videoOut = path.join(processedDir, `proc_${String(frameNum).padStart(2, '0')}.mp4`)
         // Check cancellation before each clip
-        if (cancelRequested) {
-          cancelRequested = false
+        if (state.cancelRequested) {
+          state.cancelRequested = false
           await safeSend('🛑 *Ensamblaje cancelado* en clip ' + frameNum + '/' + clipPaths.length + '.\nPuedes reintentarlo con *listo*.', { parse_mode: 'Markdown' })
           return
         }
@@ -1348,8 +1350,8 @@ module.exports = function registerCallbacks(bot) {
         { parse_mode: 'Markdown' }
       )
 
-      const videoOnlyPath = path.join(SCENES_DIR, TODAY + '_video_only.mp4')
-      const concatTxtPath = path.join(SCENES_DIR, 'concat.txt')
+      const videoOnlyPath = path.join(state.SCENES_DIR, state.TODAY + '_video_only.mp4')
+      const concatTxtPath = path.join(state.SCENES_DIR, 'concat.txt')
       fs.writeFileSync(concatTxtPath, finalClipList.map(p => `file '${p.replace(/\\/g, '/')}'`).join('\n'))
 
       await new Promise((resolve, reject) => {
@@ -1375,12 +1377,12 @@ module.exports = function registerCallbacks(bot) {
       let masterAudioPath = null
 
       // ── Prioridad 1: Narración completa subida con /subir_audio_completo ──────────
-      const narracionFiles = fs.readdirSync(SCENES_DIR)
+      const narracionFiles = fs.readdirSync(state.SCENES_DIR)
         .filter(f => f.startsWith('narracion_completa') && /\.(mp3|ogg|m4a|wav|aac|opus)$/i.test(f))
 
       if (narracionFiles.length > 0) {
-        const narracionSrc = path.join(SCENES_DIR, narracionFiles[0])
-        const narracionOut = path.join(SCENES_DIR, 'narracion_ajustada.mp3')
+        const narracionSrc = path.join(state.SCENES_DIR, narracionFiles[0])
+        const narracionOut = path.join(state.SCENES_DIR, 'narracion_ajustada.mp3')
 
         // Medir duración con múltiples métodos
         let audioDur = getVideoDuration(narracionSrc)
@@ -1427,7 +1429,7 @@ module.exports = function registerCallbacks(bot) {
 
       } else if (uploadedCount >= clipPaths.length) {
         // Audios manuales: concatenar en uno solo
-        const audioConcatTxt = path.join(SCENES_DIR, 'audio_concat.txt')
+        const audioConcatTxt = path.join(state.SCENES_DIR, 'audio_concat.txt')
         const audioLines = []
         for (let i = 1; i <= clipPaths.length; i++) {
           const p = uploadedAudioMap[i]
@@ -1435,7 +1437,7 @@ module.exports = function registerCallbacks(bot) {
         }
         if (audioLines.length > 0) {
           fs.writeFileSync(audioConcatTxt, audioLines.join('\n'))
-          const concatenatedAudio = path.join(SCENES_DIR, 'narration_concatenated.mp3')
+          const concatenatedAudio = path.join(state.SCENES_DIR, 'narration_concatenated.mp3')
           await new Promise((resolve, reject) => {
             ffmpeg().input(audioConcatTxt).inputOptions(['-f', 'concat', '-safe', '0'])
               .outputOptions(['-c:a', 'libmp3lame', '-ar', '44100', '-ac', '2'])
@@ -1457,12 +1459,12 @@ module.exports = function registerCallbacks(bot) {
         log('🎙️', `Palabras: ${wordCount} | natural: ${naturalSecs.toFixed(1)}s | target: ${targetSecs.toFixed(1)}s | rate: ${rateStr}`)
         await safeSend(`🎙️ TTS: *${wordCount} palabras* — velocidad *${rateStr}* para ${targetSecs.toFixed(1)}s`, { parse_mode: 'Markdown' })
 
-        const fullTextPath = path.join(SCENES_DIR, 'narration_full.txt')
-        const rawAudioPath = path.join(SCENES_DIR, 'narration_raw.mp3')
+        const fullTextPath = path.join(state.SCENES_DIR, 'narration_full.txt')
+        const rawAudioPath = path.join(state.SCENES_DIR, 'narration_raw.mp3')
         fs.writeFileSync(fullTextPath, fullText, 'utf8')
 
         const ttsResult = spawnSync('python', [
-          '-m', 'edge_tts', '--voice', motorVozActivo, `--rate=${rateStr}`,
+          '-m', 'edge_tts', '--voice', state.motorVozActivo, `--rate=${rateStr}`,
           '-f', fullTextPath, '--write-media', rawAudioPath
         ], { encoding: 'utf8', timeout: 120000 })
 
@@ -1539,24 +1541,24 @@ module.exports = function registerCallbacks(bot) {
           label: '📱 Vertical 9:16', desc: 'TikTok / Reels / Shorts',
           // El master ya es 2160x3840 — solo re-encoder
           vf: 'scale=2160:3840:force_original_aspect_ratio=decrease,pad=2160:3840:(ow-iw)/2:(oh-ih)/2:black,setsar=1',
-          filename: TODAY + '_vertical_9x16.mp4'
+          filename: state.TODAY + '_vertical_9x16.mp4'
         },
         {
           label: '🖥️ Horizontal 16:9', desc: 'YouTube / Facebook Video',
           // Video vertical centrado con barras negras a los lados — 4K UHD
           vf: 'scale=2160:3840:force_original_aspect_ratio=decrease,pad=3840:2160:(ow-iw)/2:(oh-ih)/2:black,setsar=1',
-          filename: TODAY + '_horizontal_16x9.mp4'
+          filename: state.TODAY + '_horizontal_16x9.mp4'
         },
         {
           label: '⬛ Cuadrado 1:1', desc: 'Instagram / Facebook Feed',
           vf: 'scale=2160:2160:force_original_aspect_ratio=decrease,pad=2160:2160:(ow-iw)/2:(oh-ih)/2:black,setsar=1',
-          filename: TODAY + '_cuadrado_1x1.mp4'
+          filename: state.TODAY + '_cuadrado_1x1.mp4'
         }
       ]
 
       const exportResults = []
       for (const fmt of formatos) {
-        const fmtPath = path.join(SCENES_DIR, fmt.filename)
+        const fmtPath = path.join(state.SCENES_DIR, fmt.filename)
         try {
           log('📐', `Exportando ${fmt.label}...`)
           await exportFormato(outputPath, fmtPath, fmt.vf)
@@ -1578,7 +1580,7 @@ module.exports = function registerCallbacks(bot) {
       // ── Subir a Drive ─────────────────────────────────────────────────────────
       await safeSend(`☁️ Subiendo ${exportResults.filter(r => r.ok).length + 1} archivos a Google Drive...`)
       const driveLinks = []
-      try { driveLinks.push(`🎬 Master: [Ver](${await uploadToGoogleDrive(outputPath, TODAY + '_master.mp4')})`) }
+      try { driveLinks.push(`🎬 Master: [Ver](${await uploadToGoogleDrive(outputPath, state.TODAY + '_master.mp4')})`) }
       catch (e) { driveLinks.push(`🎬 Master: ❌ ${e.message}`) }
       for (const r of exportResults) {
         if (!r.ok) { driveLinks.push(`${r.label}: ❌ No generado`); continue }
