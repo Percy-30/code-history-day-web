@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import axios from 'axios';
 import { createClient } from '@supabase/supabase-js';
+import { cookies } from 'next/headers';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -15,6 +16,15 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Falta el parámetro de autorización (code).' }, { status: 400 });
   }
 
+  // Leer code_verifier de las cookies (PKCE)
+  const cookieStore = cookies();
+  const code_verifier = cookieStore.get('tiktok_code_verifier')?.value;
+
+  // No lo hacemos bloqueante si falla, pero TikTok podría rechazarlo si su API lo exige.
+  // if (!code_verifier) {
+  //   return NextResponse.json({ error: 'Sesión expirada o falta code_verifier.' }, { status: 400 });
+  // }
+
   const TIKTOK_CLIENT_KEY = process.env.TIKTOK_CLIENT_KEY;
   const TIKTOK_CLIENT_SECRET = process.env.TIKTOK_CLIENT_SECRET;
   const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
@@ -28,13 +38,19 @@ export async function GET(request: Request) {
 
   try {
     // 1. Intercambiar el código por el token de acceso
-    const tokenResponse = await axios.post('https://open.tiktokapis.com/v2/oauth/token/', {
+    const payload: Record<string, string> = {
       client_key: TIKTOK_CLIENT_KEY,
       client_secret: TIKTOK_CLIENT_SECRET,
       code: code,
       grant_type: 'authorization_code',
       redirect_uri: REDIRECT_URI
-    }, {
+    };
+    
+    if (code_verifier) {
+      payload.code_verifier = code_verifier;
+    }
+
+    const tokenResponse = await axios.post('https://open.tiktokapis.com/v2/oauth/token/', payload, {
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
         'Cache-Control': 'no-cache'
@@ -74,7 +90,7 @@ export async function GET(request: Request) {
     }
 
     // 3. Mostrar pantalla de éxito
-    return new NextResponse(`
+    const response = new NextResponse(`
       <html>
         <head>
           <title>Autenticación Exitosa</title>
@@ -96,8 +112,12 @@ export async function GET(request: Request) {
       headers: { 'Content-Type': 'text/html' }
     });
 
+    // Limpiar la cookie del verifier
+    response.cookies.delete('tiktok_code_verifier');
+    return response;
+
   } catch (err: any) {
     const msg = err.response?.data?.error_description || err.response?.data?.message || err.message;
-    return NextResponse.json({ error: 'Fallo al autenticar con TikTok', detalles: msg }, { status: 500 });
+    return NextResponse.json({ error: 'Fallo al autenticar con TikTok', detalles: msg, error_obj: err.response?.data }, { status: 500 });
   }
 }
