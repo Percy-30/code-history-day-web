@@ -27,8 +27,7 @@ export async function GET(request: Request) {
 
   const TIKTOK_CLIENT_KEY = process.env.TIKTOK_CLIENT_KEY;
   const TIKTOK_CLIENT_SECRET = process.env.TIKTOK_CLIENT_SECRET;
-  const host = request.headers.get('host') || 'code-history-day-web-alpha.vercel.app';
-  const REDIRECT_URI = `https://${host}/api/tiktok/callback`;
+  const REDIRECT_URI = `https://code-history-day-web-alpha.vercel.app/api/tiktok/callback`;
   const SUPABASE_URL = process.env.SUPABASE_URL;
   const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
 

@@ -14,9 +14,8 @@ function sha256(buffer: string) {
 
 export async function GET(request: Request) {
   const TIKTOK_CLIENT_KEY = process.env.TIKTOK_CLIENT_KEY;
-  // Vercel Next.js a veces detecta la URL interna como http://. Forzamos https:// usando los headers reales.
-  const host = request.headers.get('host') || 'code-history-day-web-alpha.vercel.app';
-  const REDIRECT_URI = `https://${host}/api/tiktok/callback`;
+  // Hardcodeamos la URL exacta que está en tu portal de TikTok para descartar cualquier error
+  const REDIRECT_URI = `https://code-history-day-web-alpha.vercel.app/api/tiktok/callback`;
 
   if (!TIKTOK_CLIENT_KEY) {
     return NextResponse.json({ error: 'TIKTOK_CLIENT_KEY no está configurado.' }, { status: 500 });
