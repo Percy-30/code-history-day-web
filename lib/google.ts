@@ -65,21 +65,43 @@ export const uploadFileToDrive = async (
 ) => {
   const drive = google.drive({ version: 'v3', auth: getAuthClient() })
   
-  const stream = Readable.from(buffer)
-
-  const response = await drive.files.create({
-    requestBody: {
-      name: fileName,
-      parents: [parentFolderId],
-    },
-    media: {
-      mimeType: mimeType,
-      body: stream,
-    },
-    fields: 'id, webViewLink',
+  // Buscar si el archivo ya existe en esa carpeta
+  const existingFiles = await drive.files.list({
+    q: `'${parentFolderId}' in parents and name='${escapeDriveQueryValue(fileName)}' and trashed=false`,
+    fields: 'files(id)',
+    spaces: 'drive',
+    pageSize: 1,
   })
 
-  return response.data
+  const stream = Readable.from(buffer)
+  const existingFile = existingFiles.data.files?.[0]
+
+  if (existingFile?.id) {
+    // Si existe, actualizamos el archivo (esto evita los duplicados '(1)', '(2)', etc.)
+    const response = await drive.files.update({
+      fileId: existingFile.id,
+      media: {
+        mimeType: mimeType,
+        body: stream,
+      },
+      fields: 'id, webViewLink',
+    })
+    return response.data
+  } else {
+    // Si no existe, lo creamos
+    const response = await drive.files.create({
+      requestBody: {
+        name: fileName,
+        parents: [parentFolderId],
+      },
+      media: {
+        mimeType: mimeType,
+        body: stream,
+      },
+      fields: 'id, webViewLink',
+    })
+    return response.data
+  }
 }
 
 export const searchVideoInFolder = async (folderId: string, expectedFileName?: string) => {

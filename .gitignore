@@ -41,3 +41,11 @@ Thumbs.db
 .cursor/
 .vscode/
 .idea/
+
+# Bot and Temp Files
+scripts/.wwebjs_auth/
+*.mp4
+*.mp3
+*.log
+scripts/downloads/
+scripts/bot.log

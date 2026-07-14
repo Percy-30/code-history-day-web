@@ -85,6 +85,8 @@ export async function GET(request: NextRequest) {
       ].join('\n')
 
       const platformResults: Record<string, unknown> = {}
+      const enabledPlatforms = platformSettings.map((ps) => ps.platform as string)
+      const successfulPlatforms = new Set<string>()
 
       // 4. Publicar en cada plataforma habilitada
       for (const ps of platformSettings) {
@@ -100,6 +102,7 @@ export async function GET(request: NextRequest) {
               videoBuffer,
             })
             platformResults.youtube = ytResult
+            successfulPlatforms.add('youtube')
             await upsertDailyContent(item.date, {
               youtube_video_id: ytResult.videoId,
               status: 'publicado_youtube',
@@ -117,6 +120,7 @@ export async function GET(request: NextRequest) {
               ps.access_token
             )
             platformResults.tiktok = ttResult
+            successfulPlatforms.add('tiktok')
             console.log(`✅ [publish] TikTok publish_id: ${ttResult.publishId}`)
           }
 
@@ -130,6 +134,7 @@ export async function GET(request: NextRequest) {
               accessToken: ps.access_token,
             })
             platformResults.facebook = fbResult
+            successfulPlatforms.add('facebook')
             console.log(`✅ [publish] Facebook: ${fbResult.postUrl}`)
           }
         } catch (platformErr) {
@@ -138,12 +143,30 @@ export async function GET(request: NextRequest) {
         }
       }
 
-      // 5. Marcar como publicado
-      await upsertDailyContent(item.date, { status: 'publicado_todo' })
+      for (const platform of successfulPlatforms) {
+        await supabaseServer
+          .from('platform_publications')
+          .upsert(
+            {
+              daily_content_id: item.id,
+              platform,
+              published: true,
+              published_at: new Date().toISOString(),
+            },
+            { onConflict: 'daily_content_id,platform' }
+          )
+      }
+
+      const allEnabledPublished = enabledPlatforms.every((platform) => successfulPlatforms.has(platform))
+      if (allEnabledPublished) {
+        await upsertDailyContent(item.date, { status: 'publicado_todo' })
+      } else if (successfulPlatforms.has('youtube')) {
+        await upsertDailyContent(item.date, { status: 'publicado_youtube' })
+      }
 
       results.push({
         date: item.date,
-        status: 'publicado',
+        status: allEnabledPublished ? 'publicado_todo' : 'publicacion_parcial',
         platforms: platformResults,
       })
     }

@@ -27,9 +27,24 @@ CREATE TABLE IF NOT EXISTS platform_publications (
   UNIQUE (daily_content_id, platform)
 );
 
+-- Configuracion de plataformas de publicacion automatica
+CREATE TABLE IF NOT EXISTS platform_settings (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  platform TEXT NOT NULL UNIQUE CHECK (platform IN ('youtube', 'tiktok', 'facebook')),
+  enabled BOOLEAN NOT NULL DEFAULT FALSE,
+  privacy TEXT NOT NULL DEFAULT 'private',
+  access_token TEXT,
+  channel_id TEXT,
+  page_id TEXT,
+  extra_config JSONB NOT NULL DEFAULT '{}',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- Índices
 CREATE INDEX IF NOT EXISTS idx_daily_content_date ON daily_content(date DESC);
 CREATE INDEX IF NOT EXISTS idx_platform_publications_content_id ON platform_publications(daily_content_id);
+CREATE INDEX IF NOT EXISTS idx_platform_settings_platform ON platform_settings(platform);
 
 -- Trigger para updated_at
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -45,13 +60,22 @@ CREATE TRIGGER set_updated_at
   BEFORE UPDATE ON daily_content
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS set_updated_at ON platform_settings;
+CREATE TRIGGER set_updated_at
+  BEFORE UPDATE ON platform_settings
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
 -- RLS policies (acceso solo desde service_key)
 ALTER TABLE daily_content ENABLE ROW LEVEL SECURITY;
 ALTER TABLE platform_publications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE platform_settings ENABLE ROW LEVEL SECURITY;
 
 -- Permitir todo para service role
 CREATE POLICY "service_role_all_daily_content" ON daily_content
   FOR ALL USING (auth.role() = 'service_role');
 
 CREATE POLICY "service_role_all_platform_publications" ON platform_publications
+  FOR ALL USING (auth.role() = 'service_role');
+
+CREATE POLICY "service_role_all_platform_settings" ON platform_settings
   FOR ALL USING (auth.role() = 'service_role');

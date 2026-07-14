@@ -1,0 +1,13 @@
+@echo off
+echo Iniciando Code History Daily...
+echo ===============================
+
+echo 1. Iniciando servidor web de Next.js en segundo plano...
+start "Code History Web Server" cmd /k "cd /d d:\PROYECTOS\code-history-day-web && npm run dev"
+
+echo 2. Esperando 5 segundos para que la web inicie...
+timeout /t 5 /nobreak > nul
+
+echo 3. Iniciando Bot de Telegram...
+cd /d d:\PROYECTOS\code-history-day-web
+node scripts\telegram-meta-ai-bot.js
