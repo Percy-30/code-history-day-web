@@ -111,6 +111,7 @@ module.exports = function registerCallbacks(bot) {
 
     // Confirmar publicación de VIDEO
     if (data === 'confirm_publish_video') {
+      state.cancelRequested = false;
       await bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: chatId, message_id: messageId })
       const videoPath = bot._pendingVideoPath
       bot._pendingVideoPath = null
@@ -142,6 +143,7 @@ module.exports = function registerCallbacks(bot) {
         const results = {}
 
         // ── TikTok (vertical 9:16) ──────────────────────────────────────────────
+        if (state.cancelRequested) throw new Error('🛑 Proceso cancelado por el usuario.');
         if (pubStatus.tiktok) {
           results.tiktok = '⏭️ Ya publicado'
           await bot.sendMessage(chatId, 'TikTok: ya publicado — omitiendo')
@@ -160,6 +162,7 @@ module.exports = function registerCallbacks(bot) {
         }
 
         // ── Facebook Reel (vertical 9:16) ───────────────────────────────────────
+        if (state.cancelRequested) throw new Error('🛑 Proceso cancelado por el usuario.');
         if (pubStatus.facebook_reel) {
           results.facebook_reel = '⏭️ Ya publicado'
           await bot.sendMessage(chatId, 'Facebook Reel: ya publicado — omitiendo')
@@ -178,6 +181,7 @@ module.exports = function registerCallbacks(bot) {
         }
 
         // ── YouTube Short (vertical 9:16) ───────────────────────────────────────
+        if (state.cancelRequested) throw new Error('🛑 Proceso cancelado por el usuario.');
         if (pubStatus.youtube_short) {
           results.youtube_short = '⏭️ Ya publicado'
           await bot.sendMessage(chatId, 'YouTube Short: ya publicado — omitiendo')
@@ -224,6 +228,7 @@ module.exports = function registerCallbacks(bot) {
     }
 
     if (data === 'confirm_publish_16x9') {
+      state.cancelRequested = false;
       await bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: chatId, message_id: messageId })
       const horizPath = bot._pendingHorizPath
       bot._pendingHorizPath = null
@@ -261,6 +266,7 @@ module.exports = function registerCallbacks(bot) {
         oauth2.setCredentials({ refresh_token: process.env.GOOGLE_REFRESH_TOKEN })
 
         // YouTube Video 16:9
+        if (state.cancelRequested) throw new Error('🛑 Proceso cancelado por el usuario.');
         await bot.sendMessage(chatId, '⏳ Subiendo a YouTube Video (16:9)...')
         let ytRes = ''
         try {
@@ -283,6 +289,7 @@ module.exports = function registerCallbacks(bot) {
         await safeSend(ytRes)
 
         // Facebook Video 16:9
+        if (state.cancelRequested) throw new Error('🛑 Proceso cancelado por el usuario.');
         await bot.sendMessage(chatId, '⏳ Subiendo a Facebook Video (16:9)...')
         let fbRes = ''
         try {

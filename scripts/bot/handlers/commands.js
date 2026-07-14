@@ -68,6 +68,12 @@ module.exports = function registerCommands(bot) {
     return
   }
 
+  if (text === '/parar') {
+    state.cancelRequested = true;
+    await bot.sendMessage(CHAT_ID, '🛑 Cancelación solicitada. Los procesos en curso se detendrán en breve.');
+    return;
+  }
+
   if (text === '/publicar_video') {
     // Buscar el mejor formato disponible para publicar
     const formatsToCheck = [
