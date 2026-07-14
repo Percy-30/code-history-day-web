@@ -14,9 +14,9 @@ function sha256(buffer: string) {
 
 export async function GET(request: Request) {
   const TIKTOK_CLIENT_KEY = process.env.TIKTOK_CLIENT_KEY;
-  // Obtenemos el dominio real automáticamente desde la URL que visitaste
-  const { origin } = new URL(request.url);
-  const REDIRECT_URI = `${origin}/api/tiktok/callback`;
+  // Vercel Next.js a veces detecta la URL interna como http://. Forzamos https:// usando los headers reales.
+  const host = request.headers.get('host') || 'code-history-day-web-alpha.vercel.app';
+  const REDIRECT_URI = `https://${host}/api/tiktok/callback`;
 
   if (!TIKTOK_CLIENT_KEY) {
     return NextResponse.json({ error: 'TIKTOK_CLIENT_KEY no está configurado.' }, { status: 500 });
