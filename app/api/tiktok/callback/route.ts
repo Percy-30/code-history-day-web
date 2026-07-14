@@ -27,8 +27,8 @@ export async function GET(request: Request) {
 
   const TIKTOK_CLIENT_KEY = process.env.TIKTOK_CLIENT_KEY;
   const TIKTOK_CLIENT_SECRET = process.env.TIKTOK_CLIENT_SECRET;
-  const SITE_URL = process.env.NEXTAUTH_URL || 'http://localhost:3000';
-  const REDIRECT_URI = `${SITE_URL}/api/tiktok/callback`;
+  const { origin } = new URL(request.url);
+  const REDIRECT_URI = `${origin}/api/tiktok/callback`;
   const SUPABASE_URL = process.env.SUPABASE_URL;
   const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
 
