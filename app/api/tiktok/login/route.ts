@@ -14,7 +14,8 @@ function sha256(buffer: string) {
 
 export async function GET(request: Request) {
   const TIKTOK_CLIENT_KEY = process.env.TIKTOK_CLIENT_KEY;
-  const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+  // Usamos NEXTAUTH_URL porque ya la tienes configurada en Vercel con tu dominio real
+  const SITE_URL = process.env.NEXTAUTH_URL || 'http://localhost:3000';
   const REDIRECT_URI = `${SITE_URL}/api/tiktok/callback`;
 
   if (!TIKTOK_CLIENT_KEY) {
