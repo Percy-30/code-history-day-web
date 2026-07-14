@@ -35,8 +35,47 @@ export async function GET(request: Request) {
   authUrl.searchParams.append('code_challenge', code_challenge);
   authUrl.searchParams.append('code_challenge_method', 'S256');
 
-  // 2. Redirigir y guardar el code_verifier en una cookie HTTP-only
-  const response = NextResponse.redirect(authUrl.toString());
+  // Construir la URL exacta del usuario manual pero con la nueva redirect_uri
+  const manualUrl = `https://www.tiktok.com/v2/auth/authorize/?client_key=${TIKTOK_CLIENT_KEY}&response_type=code&scope=user.info.basic,video.upload,video.list&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&state=tiktok_auth`;
+
+  // Construir URL sin PKCE
+  const noPkceUrl = `https://www.tiktok.com/v2/auth/authorize/?client_key=${TIKTOK_CLIENT_KEY}&response_type=code&scope=user.info.basic,video.upload,video.list&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&state=${state}`;
+
+  const response = new NextResponse(`
+    <html>
+      <head>
+         <meta charset="utf-8">
+         <title>Depuración de TikTok</title>
+         <style>
+            body { font-family: system-ui, sans-serif; padding: 2rem; background: #000; color: #fff; }
+            a { color: #00f2fe; word-break: break-all; }
+            .box { background: #111; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #333; }
+         </style>
+      </head>
+      <body>
+         <h1>🕵️‍♂️ Panel de Diagnóstico de TikTok</h1>
+         <p>TikTok nos está bloqueando por un detalle minúsculo en la URL. Prueba hacer clic en estos 3 enlaces, a ver cuál te deja pasar:</p>
+         
+         <div class="box">
+           <h3>1. URL de mi código (Con seguridad PKCE)</h3>
+           <p><a href="${authUrl.toString()}">👉 Probar Enlace 1</a></p>
+         </div>
+
+         <div class="box">
+           <h3>2. URL sin PKCE</h3>
+           <p><a href="${noPkceUrl}">👉 Probar Enlace 2</a></p>
+         </div>
+
+         <div class="box">
+           <h3>3. Tu URL manual EXACTA</h3>
+           <p>Esta es literalmente la URL que me pasaste antes, pero apuntando a Vercel.</p>
+           <p><a href="${manualUrl}">👉 Probar Enlace 3</a></p>
+         </div>
+      </body>
+    </html>
+  `, { headers: { 'Content-Type': 'text/html' } });
+
+  // Guardamos la cookie de todas formas por si funcionan los enlaces
   response.cookies.set('tiktok_code_verifier', code_verifier, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
