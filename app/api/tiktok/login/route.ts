@@ -29,7 +29,7 @@ export async function GET(request: Request) {
   const authUrl = new URL('https://www.tiktok.com/v2/auth/authorize/');
   authUrl.searchParams.append('client_key', TIKTOK_CLIENT_KEY);
   authUrl.searchParams.append('response_type', 'code');
-  authUrl.searchParams.append('scope', 'user.info.basic,video.upload,video.publish');
+  authUrl.searchParams.append('scope', 'user.info.basic,video.upload,video.list');
   authUrl.searchParams.append('redirect_uri', REDIRECT_URI);
   authUrl.searchParams.append('state', state);
   authUrl.searchParams.append('code_challenge', code_challenge);
