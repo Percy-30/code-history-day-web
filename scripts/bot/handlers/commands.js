@@ -45,6 +45,7 @@ module.exports = function registerCommands(bot) {
       `📢 */publicar_post* — Publicar Post Gráfico en Facebook\n` +
       `📝 */ver_descripcion_post* — Ver y copiar la descripción del post\n` +
       `🎬 */subir_video_shorts* — Subir tu video editado y publicar automáticamente\n` +
+      `⚡ */subir_video_directo* — Subir video crudo y publicar directamente\n` +
       `🎥 */publicar_video* — Publicar vertical 9:16 (TikTok + FB Reel + YT Short)\n` +
       `🖥️ */publicar_video_16x9* — Publicar horizontal 16:9 (YouTube Video + Facebook Video)\n` +
       `🔍 */estado* — Ver clips guardados + intro/salida activos\n` +
@@ -136,18 +137,33 @@ module.exports = function registerCommands(bot) {
     return
   }
 
+  // /subir_video_directo — Subir video crudo y publicar directamente
+  if (text === '/subir_video_directo' || text.startsWith('/subir_video_directo')) {
+    state.pendingUploadMode = 'video_directo'
+    await bot.sendMessage(CHAT_ID,
+      '⚡ *Modo: Subir Video Directo activado*\n\n' +
+      'Envíame ahora el video (crudo).\nSe procesará y publicará automáticamente utilizando los textos generados de hoy.',
+      { parse_mode: 'Markdown' }
+    )
+    return
+  }
+
   // /generar_dia — Generar la eféméride completa del día: TXTs, portada, y prompt Meta AI
   if (text === '/publicar_post') {
     const imgPath = path.join(state.SCENES_DIR, `ephemeris_${state.TODAY}.jpg`)
     const txtPath = path.join(state.SCENES_DIR, `post_text_${state.TODAY}.txt`)
 
     if (!fs.existsSync(imgPath)) {
-      await bot.sendMessage(CHAT_ID,
-        `❌ No encuentro la portada local de hoy.\n\n` +
-        `Archivo esperado:\n\`${imgPath}\`\n\n` +
-        `Primero usa /subir_portada y enviame la imagen como FOTO.`,
-        { parse_mode: 'Markdown' }
-      )
+      try {
+        await bot.sendMessage(CHAT_ID,
+          `❌ No encuentro la portada local de hoy.\n\n` +
+          `Archivo esperado:\n<code>${escapeHTML(imgPath)}</code>\n\n` +
+          `Primero usa /subir_portada y enviame la imagen como FOTO.`,
+          { parse_mode: 'HTML' }
+        )
+      } catch(err) {
+        log('❌', 'Error enviando msg de portada: ' + err.message)
+      }
       return
     }
 
@@ -312,14 +328,20 @@ module.exports = function registerCommands(bot) {
     const sizeMB = (fs.statSync(imgPath).size / 1024 / 1024).toFixed(2)
 
     // Enviar primero la imagen con caption corto (límite 1024 chars en captions de foto)
-    await bot.sendPhoto(CHAT_ID, imgPath, {
-      caption:
-        `📢 <b>Previsualización del Post Gráfico</b>\n\n` +
-        `🖼️ Portada: <code>${path.basename(imgPath)}</code>\n` +
-        `📦 Tamaño: <b>${sizeMB} MB</b>\n\n` +
-        `El texto completo del post va en el siguiente mensaje. ⬇️`,
-      parse_mode: 'HTML'
-    })
+    try {
+      await bot.sendPhoto(CHAT_ID, imgPath, {
+        caption:
+          `📢 <b>Previsualización del Post Gráfico</b>\n\n` +
+          `🖼️ Portada: <code>${path.basename(imgPath)}</code>\n` +
+          `📦 Tamaño: <b>${sizeMB} MB</b>\n\n` +
+          `El texto completo del post va en el siguiente mensaje. ⬇️`,
+        parse_mode: 'HTML'
+      })
+    } catch(err) {
+      log('❌', 'Error al enviar previsualización: ' + err.message)
+      await bot.sendMessage(CHAT_ID, `❌ Error enviando foto: ${err.message}`)
+      return
+    }
 
     // Enviar el texto completo del post como mensaje independiente (sin límite de 1024 chars)
     // Dividir si supera 4096 chars (límite de Telegram por mensaje)
@@ -382,6 +404,8 @@ module.exports = function registerCommands(bot) {
       // 3. Descargar los TXTs desde Drive (leer de Supabase para obtener el folder ID)
       // Usamos las constantes del nivel superior: SUPABASE_URL y SUPABASE_KEY (definidas al inicio del archivo)
       let metaAIPromptText = null
+      let ephemerisText = 'Efeméride tecnológica del día'
+      let historicalDateStr = targetDate
 
       if (SUPABASE_URL && SUPABASE_KEY) {
         const supaRes = await axios.get(
@@ -391,7 +415,7 @@ module.exports = function registerCommands(bot) {
         const supaData = supaRes.data
         if (Array.isArray(supaData) && supaData.length > 0) {
           const record = supaData[0]
-          const ephemerisText = record.ephemeris_text || ''
+          ephemerisText = record.ephemeris_text || ephemerisText
           const scenes = record.scenes || []
 
           // Reconstruir el prompt de Meta AI localmente (igual que en el cron)
@@ -401,7 +425,7 @@ module.exports = function registerCommands(bot) {
 
           // ── Obtener la fecha histórica REAL desde la tabla ephemerides ─────────
           const monthNames = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre']
-          let historicalDateStr = formattedDate // fallback: fecha actual si no encontramos la histórica
+          historicalDateStr = formattedDate // fallback: fecha actual si no encontramos la histórica
           try {
             const ephemRes = await axios.get(
               `${SUPABASE_URL}/rest/v1/ephemerides?display_date=eq.${targetDate}&limit=1&select=historical_day,historical_month,historical_year`,
@@ -477,10 +501,10 @@ Empezamos con el FOTOGRAMA 1`
           fs.writeFileSync(path.join(state.SCENES_DIR, `02_prompts_imagenes_${targetDate}.txt`), textImagenes, 'utf8')
           fs.writeFileSync(path.join(state.SCENES_DIR, `06_prompt_meta_ai_master_${targetDate}.txt`), metaAIPromptText, 'utf8')
 
-          await bot.sendMessage(CHAT_ID, `✅ Paso 2/4 — 4 archivos TXT guardados en \`scenes/${targetDate}/\``)
+          await bot.sendMessage(CHAT_ID, `✅ Paso 2/5 — 4 archivos TXT guardados en \`scenes/${targetDate}/\``)
 
           // ── Generar Prompts para Shorts (Luma/Veo 3) ─────────────────────────
-          await bot.sendMessage(CHAT_ID, `🎬 Paso 3/4 — Generando prompts cinematográficos para Shorts con IA...`)
+          await bot.sendMessage(CHAT_ID, `🎬 Paso 3/5 — Generando prompts cinematográficos para Shorts con IA...`)
           try {
             const shortsPrompts = await generateShortsPrompts(
               historicalDateStr || targetDate,
@@ -504,7 +528,24 @@ Empezamos con el FOTOGRAMA 1`
         }
       }
 
-      await bot.sendMessage(CHAT_ID, `📣 Paso 4/4 — Enviando Prompt Maestro para Meta AI...`)
+      // ── Generar Post para Redes Sociales con Groq AI ─────────────────────────
+      await bot.sendMessage(CHAT_ID, `📝 Paso 4/5 — Redactando post profesional para redes sociales...`)
+      try {
+        const { generateProfessionalPost } = require('../services/groq')
+        const postContent = await generateProfessionalPost(
+          historicalDateStr || targetDate,
+          ephemerisText || 'Efeméride tecnológica del día'
+        )
+        fs.writeFileSync(path.join(state.SCENES_DIR, `post_text_${targetDate}.txt`), postContent, 'utf8')
+        fs.writeFileSync(path.join(state.SCENES_DIR, `05_social_media_post_${targetDate}.txt`), postContent, 'utf8')
+        await bot.sendMessage(CHAT_ID, `✅ Post guardado en \`post_text_${targetDate}.txt\``, { parse_mode: 'Markdown' })
+      } catch (err) {
+        log('⚠️', `No se generó el post de redes sociales: ${err.message}`)
+        const fallbackPost = `🚀 CodeHistory Daily | Efeméride Tecnológica del Día\n\n📅 ${historicalDateStr || targetDate}\n\nDescubre la historia tecnológica de hoy en CodeHistory Daily.\n\n🌍 Más historias tecnológicas:\nhttps://code-history-day-web-alpha.vercel.app\n\n▶️ youtube.com/@CodeHistoryDaily\n\n🎵 tiktok.com/@codehistorydaily\n\n📱 facebook.com/CodeHistoryDaily\n\n#CodeHistoryDaily #HistoriaDelCódigo #ATPDev #Tecnologia #Historia`
+        fs.writeFileSync(path.join(state.SCENES_DIR, `post_text_${targetDate}.txt`), fallbackPost, 'utf8')
+      }
+      
+      await bot.sendMessage(CHAT_ID, `📣 Paso 5/5 — Enviando Prompt Maestro para Meta AI...`)
 
       // 4. Enviar el prompt de Meta AI al chat (en partes si es largo)
       if (metaAIPromptText) {

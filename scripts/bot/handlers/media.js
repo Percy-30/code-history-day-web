@@ -5,6 +5,9 @@ const { truncateAtWord, detectFrameNumber, escapeHTML } = require('../utils/text
 const { selectBGMByContext, findBGMByTag } = require('../utils/bgm')
 const { uploadToGoogleDrive, createDriveClient } = require('../services/drive')
 const { generateYouTubeDescription, cleanScriptWithAI, generateProfessionalPost } = require('../services/groq')
+const { getAudioDir } = require('../utils/paths')
+const { processDownloadQueue } = require('../utils/download-queue')
+const { procesarYPublicarShorts, publicarVideoDirecto } = require('../services/video-processor')
 const axios = require('axios')
 const fs = require('fs')
 const path = require('path')
@@ -161,6 +164,25 @@ module.exports = function registerMediaHandler(bot) {
         const sizeMB = (response.data.byteLength / 1024 / 1024).toFixed(1)
         await bot.sendMessage(CHAT_ID, '✅ Video recibido (' + sizeMB + ' MB). Procesando...')
         await procesarYPublicarShorts(localPath, CHAT_ID)
+      } catch(err) {
+        await bot.sendMessage(CHAT_ID, '❌ Error: ' + err.message)
+      }
+      return
+    }
+
+    // ── Modo: Subir Video en Crudo Directo ────────────────────────────────────
+    if (!isPhoto && mimeType && mimeType.includes('video') && state.pendingUploadMode === 'video_directo') {
+      state.pendingUploadMode = null
+      await bot.sendMessage(CHAT_ID, '⬇️ Descargando tu video en crudo...')
+      try {
+        const fileInfo = await bot.getFile(fileId)
+        const fileUrl  = 'https://api.telegram.org/file/bot' + BOT_TOKEN + '/' + fileInfo.file_path
+        const response = await axios({ method: 'get', url: fileUrl, responseType: 'arraybuffer' })
+        const localPath = path.join(state.SCENES_DIR, 'input_directo_' + state.TODAY + '.mp4')
+        fs.writeFileSync(localPath, response.data)
+        const sizeMB = (response.data.byteLength / 1024 / 1024).toFixed(1)
+        await bot.sendMessage(CHAT_ID, '✅ Video en crudo recibido (' + sizeMB + ' MB). Preparando publicación...')
+        await publicarVideoDirecto(localPath, CHAT_ID)
       } catch(err) {
         await bot.sendMessage(CHAT_ID, '❌ Error: ' + err.message)
       }

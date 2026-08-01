@@ -51,7 +51,7 @@ module.exports = function registerCallbacks(bot) {
       await bot.sendMessage(chatId, '🚀 Publicando el Post Gráfico en Facebook...');
       try {
         const imgPath = path.join(state.SCENES_DIR, `ephemeris_${state.TODAY}.jpg`);
-        const txtPath = path.join(state.SCENES_DIR, `post_text_${state.TODAY}.txt`);
+        const txtPath = path.join(state.SCENES_DIR, `05_social_media_post_${state.TODAY}.txt`);
 
         if (!fs.existsSync(imgPath) || !fs.existsSync(txtPath)) {
           throw new Error('No se encontraron los archivos locales descargados.');
@@ -97,7 +97,7 @@ module.exports = function registerCallbacks(bot) {
     // Regenerar publicación
     if (data === 'regenerate_post') {
       await bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: chatId, message_id: messageId });
-      const txtPath = path.join(state.SCENES_DIR, `post_text_${state.TODAY}.txt`);
+      const txtPath = path.join(state.SCENES_DIR, `05_social_media_post_${state.TODAY}.txt`);
       try {
         if (fs.existsSync(txtPath)) {
           fs.unlinkSync(txtPath);
@@ -128,7 +128,7 @@ module.exports = function registerCallbacks(bot) {
         // Cargar descripción corta
         let postText = 'CodeHistory Daily - Efeméride tecnológica del día \n\n▶️ youtube.com/@CodeHistoryDaily\n🎵 tiktok.com/@codehistorydaily\n📱 facebook.com/CodeHistoryDaily\n\n#CodeHistoryDaily #ATPDev #Tecnologia'
         try {
-          const txtPath = path.join(state.SCENES_DIR, 'post_text_' + state.TODAY + '.txt')
+          const txtPath = path.join(state.SCENES_DIR, '05_social_media_post_' + state.TODAY + '.txt')
           if (fs.existsSync(txtPath)) postText = fs.readFileSync(txtPath, 'utf8')
         } catch (_) { }
 
@@ -186,24 +186,41 @@ module.exports = function registerCallbacks(bot) {
           results.youtube_short = '⏭️ Ya publicado'
           await bot.sendMessage(chatId, 'YouTube Short: ya publicado — omitiendo')
         } else {
-          await bot.sendMessage(chatId, '⏳ Subiendo YouTube Short (9:16)...')
-          try {
-            const youtube = google.youtube({ version: 'v3', auth: oauth2 })
-            const resYt = await youtube.videos.insert({
-              part: 'snippet,status',
-              requestBody: {
-                snippet: {
-                  title: postText.split('\n')[0].substring(0, 85) + ' #Shorts',
-                  description: postText + '\n\n#Shorts\n\nMusic by Kevin MacLeod (incompetech.com) Licensed under CC BY 3.0',
-                  tags: ['tecnologia', 'programacion', 'historia', 'shorts', 'CodeHistoryDaily']
+          await bot.sendMessage(chatId, '⏳ Subiendo YouTube Short (9:16)... (resumable upload)')
+          const maxRetries = 3;
+          for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+              if (attempt > 1) await bot.sendMessage(chatId, `🔄 Reintento ${attempt}/${maxRetries}...`);
+              const youtube = google.youtube({ version: 'v3', auth: oauth2 })
+              const fileSize = fs.statSync(videoPath).size;
+              const resYt = await youtube.videos.insert({
+                part: 'snippet,status',
+                requestBody: {
+                  snippet: {
+                    title: postText.split('\n')[0].substring(0, 85) + ' #Shorts',
+                    description: postText + '\n\n#Shorts\n\nMusic by Kevin MacLeod (incompetech.com) Licensed under CC BY 3.0',
+                    tags: ['tecnologia', 'programacion', 'historia', 'shorts', 'CodeHistoryDaily']
+                  },
+                  status: { privacyStatus: 'public', selfDeclaredMadeForKids: false }
                 },
-                status: { privacyStatus: 'public', selfDeclaredMadeForKids: false }
-              },
-              media: { body: fs.createReadStream(videoPath) }
-            })
-            results.youtube_short = '✅ ID ' + resYt.data.id
-            pubStatus.youtube_short = true
-          } catch (e) { results.youtube_short = '❌ ' + e.message.substring(0, 150) }
+                media: { body: fs.createReadStream(videoPath) }
+              }, {
+                timeout: 600000 // 10 mins
+              })
+              results.youtube_short = '✅ ID ' + resYt.data.id
+              pubStatus.youtube_short = true
+              break; // Éxito, salir del loop
+            } catch (e) {
+              const errMsg = e.message || String(e);
+              if (attempt < maxRetries && (errMsg.includes('ECONNRESET') || errMsg.includes('ETIMEDOUT') || errMsg.includes('socket hang up') || errMsg.includes('timeout'))) {
+                log('⚠️', `YouTube upload attempt ${attempt} failed: ${errMsg}. Retrying in 5s...`);
+                await new Promise(r => setTimeout(r, 5000));
+              } else {
+                results.youtube_short = '❌ ' + errMsg.substring(0, 150);
+                break; // Error fatal, salir del loop
+              }
+            }
+          }
           await safeSend('▶️ YouTube Short: ' + results.youtube_short)
         }
 
@@ -241,7 +258,7 @@ module.exports = function registerCallbacks(bot) {
       let longDesc = ''
       try {
         const ytDescPath = path.join(path.dirname(horizPath), 'yt_description_' + state.TODAY + '.txt')
-        const postTxtPath = path.join(path.dirname(horizPath), 'post_text_' + state.TODAY + '.txt')
+        const postTxtPath = path.join(path.dirname(horizPath), '05_social_media_post_' + state.TODAY + '.txt')
         const narrationPath = path.join(path.dirname(horizPath), 'narration_full.txt')
         if (fs.existsSync(ytDescPath)) {
           longDesc = fs.readFileSync(ytDescPath, 'utf8')
@@ -267,25 +284,42 @@ module.exports = function registerCallbacks(bot) {
 
         // YouTube Video 16:9
         if (state.cancelRequested) throw new Error('🛑 Proceso cancelado por el usuario.');
-        await bot.sendMessage(chatId, '⏳ Subiendo a YouTube Video (16:9)...')
+        await bot.sendMessage(chatId, '⏳ Subiendo a YouTube Video (16:9)... (resumable upload)')
         let ytRes = ''
-        try {
-          const youtube = google.youtube({ version: 'v3', auth: oauth2 })
-          const titleBase = longDesc.split('\n')[0].substring(0, 90)
-          const resYt = await youtube.videos.insert({
-            part: 'snippet,status',
-            requestBody: {
-              snippet: {
-                title: titleBase,
-                description: longDesc,
-                tags: ['tecnologia', 'programacion', 'historia', 'CodeHistoryDaily', 'efemeride', 'HistoriaTech']
+        const maxRetriesYt = 3;
+        for (let attempt = 1; attempt <= maxRetriesYt; attempt++) {
+          try {
+            if (attempt > 1) await bot.sendMessage(chatId, `🔄 Reintento YouTube ${attempt}/${maxRetriesYt}...`);
+            const youtube = google.youtube({ version: 'v3', auth: oauth2 })
+            const titleBase = longDesc.split('\n')[0].substring(0, 90)
+            const fileSize = fs.statSync(horizPath).size;
+            const resYt = await youtube.videos.insert({
+              part: 'snippet,status',
+              requestBody: {
+                snippet: {
+                  title: titleBase,
+                  description: longDesc,
+                  tags: ['tecnologia', 'programacion', 'historia', 'CodeHistoryDaily', 'efemeride', 'HistoriaTech']
+                },
+                status: { privacyStatus: 'public', selfDeclaredMadeForKids: false }
               },
-              status: { privacyStatus: 'public', selfDeclaredMadeForKids: false }
-            },
-            media: { body: fs.createReadStream(horizPath) }
-          })
-          ytRes = '▶️ YouTube: ✅ ID ' + resYt.data.id
-        } catch (e) { ytRes = '▶️ YouTube: ❌ ' + e.message.substring(0, 150) }
+              media: { body: fs.createReadStream(horizPath) }
+            }, {
+              timeout: 600000 // 10 mins
+            })
+            ytRes = '▶️ YouTube: ✅ ID ' + resYt.data.id
+            break;
+          } catch (e) {
+            const errMsg = e.message || String(e);
+            if (attempt < maxRetriesYt && (errMsg.includes('ECONNRESET') || errMsg.includes('ETIMEDOUT') || errMsg.includes('socket hang up') || errMsg.includes('timeout'))) {
+              log('⚠️', `YouTube 16:9 upload attempt ${attempt} failed: ${errMsg}. Retrying in 5s...`);
+              await new Promise(r => setTimeout(r, 5000));
+            } else {
+              ytRes = '▶️ YouTube: ❌ ' + errMsg.substring(0, 150);
+              break; // Error fatal, salir del loop
+            }
+          }
+        }
         await safeSend(ytRes)
 
         // Facebook Video 16:9
@@ -687,81 +721,7 @@ module.exports = function registerCallbacks(bot) {
     }
   })
 
-  // ── Cola de descargas secuenciales (1 a 1) ──────────────────────────
-  async function processDownloadQueue() {
-    if (state.isDownloading || state.downloadQueue.length === 0) return
-    state.isDownloading = true
 
-    while (state.downloadQueue.length > 0) {
-      if (state.cancelRequested) {
-        log('🛑', 'Descarga cancelada')
-        await bot.sendMessage(CHAT_ID, '🛑 Descarga cancelada. ' + state.receivedScenes.length + ' clips guardados.')
-        state.cancelRequested = false; state.isDownloading = false; return
-      }
-      const { fileId, clipNum, filename, filePath } = state.downloadQueue.shift()
-      let success = false
-
-      // Intentar hasta 3 veces
-      for (let attempt = 1; attempt <= 3; attempt++) {
-        try {
-          log('📥', `Descargando clip #${clipNum} (intento ${attempt}/3)...`)
-          const fileUrl = await bot.getFileLink(fileId)
-          const resp = await axios.get(fileUrl, { responseType: 'arraybuffer', timeout: 60000 })
-          fs.writeFileSync(filePath, resp.data)
-          state.receivedScenes.push(filePath)
-          const sizekB = Math.round(resp.data.byteLength / 1024)
-          log('✅', `Clip #${clipNum} guardado: ${filename} (${sizekB} KB)`)
-
-          const pendientes = state.totalScenes > 0 ? state.totalScenes - clipNum : '?'
-          await bot.sendMessage(CHAT_ID,
-            `✅ *Clip #${clipNum} guardado* → \`${filename}\` (${sizekB} KB)\n` +
-            (state.totalScenes > 0
-              ? (clipNum >= state.totalScenes
-                ? `🎬 ¡Eso es todo! Escribe *listo* para armar el video final.`
-                : `📬 Faltan *${pendientes}* clip(s) más.`)
-              : `📬 Sigue enviando. Cuando termines escribe *listo*.`),
-            { parse_mode: 'Markdown' }
-          )
-          success = true
-          break
-        } catch (err) {
-          log('⚠️', `Intento ${attempt} fallido para clip #${clipNum}: ${err.message}`)
-          if (attempt < 3) await new Promise(r => setTimeout(r, 3000))
-        }
-      }
-
-      if (!success) {
-        log('❌', `Clip #${clipNum} falló 3 veces, omitido.`)
-        state.failedClips.push(clipNum) // 📌 Registrar para el reporte final
-        await bot.sendMessage(CHAT_ID,
-          `⚠️ Clip #${clipNum} falló 3 veces. Lo anoto para avisarte al final.`,
-          { parse_mode: 'Markdown' }
-        )
-      }
-
-      await new Promise(r => setTimeout(r, 500))
-    }
-
-    state.isDownloading = false
-
-    // 📌 Reporte final cuando la cola se vacía
-    if (state.failedClips.length > 0) {
-      await bot.sendMessage(CHAT_ID,
-        `⚠️ *Descarga terminada con ${state.failedClips.length} error(es)*\n\n` +
-        `Los siguientes clips no se pudieron bajar. Por favor reenvíamelos de nuevo:\n\n` +
-        state.failedClips.map(n => `• Video #${n}`).join('\n') +
-        `\n\n💡 Envíamelos uno por uno y el bot los agregará automáticamente al lote.`,
-        { parse_mode: 'Markdown' }
-      )
-    } else if (state.downloadQueue.length === 0 && state.receivedScenes.length > 0) {
-      await bot.sendMessage(CHAT_ID,
-        `✅ *¡Todos los ${state.receivedScenes.length} clips descargados correctamente!*\n` +
-        `Escribe *listo* para ensamblar el video final.`,
-        { parse_mode: 'Markdown' }
-      )
-    }
-
-  } // ── fin processDownloadQueue
 
   // ── Enviar escenas desde Supabase ─────────────────────────────────────────────
   async function enviarEscenasDeHoy(specificDate = null) {
@@ -1123,7 +1083,7 @@ module.exports = function registerCallbacks(bot) {
       // 9. Previsualizar post y preguntar si publicar
       let postTextPreview = 'Sin descripción disponible. Usa /publicar_post si necesitas que la IA lo redacte.'
       try {
-        const txtPath = path.join(state.SCENES_DIR, `post_text_${state.TODAY}.txt`)
+        const txtPath = path.join(state.SCENES_DIR, `05_social_media_post_${state.TODAY}.txt`)
         if (fs.existsSync(txtPath)) {
           postTextPreview = fs.readFileSync(txtPath, 'utf8').substring(0, 300)
         }

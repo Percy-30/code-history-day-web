@@ -139,8 +139,8 @@ async function publishToTikTok(videoPath, title) {
   if (!accessToken) throw new Error('No hay access_token guardado en Supabase para TikTok.');
 
   const videoSize = fs.statSync(videoPath).size
-  const chunkSize = 30 * 1024 * 1024; // 30 MB por chunk
-  const totalChunks = Math.max(1, Math.floor(videoSize / chunkSize));
+  const chunkSize = Math.min(30 * 1024 * 1024, videoSize); // Máximo 30MB, o el tamaño del video
+  const totalChunks = Math.ceil(videoSize / chunkSize);
 
   // Función envoltorio para intentar llamar a la API y refrescar si falla
   async function callInitApi(token) {

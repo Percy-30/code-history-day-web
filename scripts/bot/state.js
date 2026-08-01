@@ -5,14 +5,7 @@ const path = require('path')
 const fs   = require('fs')
 const { SCENES_BASE_DIR } = require('./config')
 
-// Calcular la fecha actual en la zona horaria local (UTC-5 para Perú)
-const offset = -5
-const localDate = new Date(new Date().getTime() + offset * 3600 * 1000)
-
 const state = {
-  TODAY:       localDate.toISOString().split('T')[0],
-  SCENES_DIR:  '',
-
   sceneCounter:       0,
   totalScenes:        0,
   receivedScenes:     [],
@@ -27,8 +20,20 @@ const state = {
   cancelRequested:    false,
 }
 
-// Inicializar SCENES_DIR
-state.SCENES_DIR = path.join(SCENES_BASE_DIR, state.TODAY)
-if (!fs.existsSync(state.SCENES_DIR)) fs.mkdirSync(state.SCENES_DIR, { recursive: true })
+Object.defineProperty(state, 'TODAY', {
+  get: function() {
+    const offset = -5
+    const localDate = new Date(new Date().getTime() + offset * 3600 * 1000)
+    return localDate.toISOString().split('T')[0]
+  }
+})
+
+Object.defineProperty(state, 'SCENES_DIR', {
+  get: function() {
+    const dir = path.join(SCENES_BASE_DIR, this.TODAY)
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
+    return dir
+  }
+})
 
 module.exports = state

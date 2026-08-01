@@ -39,6 +39,9 @@ function initBot() {
     polling: true
   });
 
+  const botInstance = require('./bot/utils/bot-instance');
+  botInstance.init(bot, CHAT_ID);
+
   // Manejar errores de red de Telegram silenciosamente
   bot.on('polling_error', (error) => {
     if (error.code === 'EFATAL' || (error.message && error.message.includes('fetch failed'))) {
@@ -49,6 +52,7 @@ function initBot() {
   });
 
   // Registrar todos los handlers de manera limpia
+  bot.on("message", (msg) => console.log("RECIBIDO:", msg.text));
   registerCommands(bot);
   registerMediaHandler(bot);
   registerCallbacks(bot);
