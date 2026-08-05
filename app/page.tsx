@@ -1,27 +1,33 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Calendar, Code, Terminal, Clock, Share2 } from "lucide-react"
+import { Calendar, Code, Terminal, Clock, Share2, Flame, Sparkles, BookOpen, Search, ExternalLink, RefreshCw, Send } from "lucide-react"
 import { XLogo } from "@/components/ui/x-logo"
 import { getCloseTabCommand, getOSInfo } from "@/lib/browser-utils"
 import { getTodayEphemeris, formatEphemerisForDisplay } from "@/lib/ephemerides"
 import type { Ephemeris } from "@/app/api/ephemerides/route"
+import type { DailyContent } from "@/lib/daily-content"
 
-export default function ProgrammingEphemeris() {
+export default function AlmaniqWeb() {
+  const [activeTab, setActiveTab] = useState<"ephemeris" | "trends" | "history">("ephemeris")
   const [currentTime, setCurrentTime] = useState("")
   const [todayEphemeris, setTodayEphemeris] = useState<Ephemeris | null>(null)
+  const [trendsHistory, setTrendsHistory] = useState<DailyContent[]>([])
+  const [selectedContent, setSelectedContent] = useState<DailyContent | null>(null)
+  const [searchQuery, setSearchQuery] = useState("")
+  
   const [displayText, setDisplayText] = useState("")
   const [isTyping, setIsTyping] = useState(true)
   const [closeCommand, setCloseCommand] = useState("Ctrl+W")
   const [isMobile, setIsMobile] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  
+  // Interactive Terminal state
   const [terminalInput, setTerminalInput] = useState("")
-  const [isTerminalFocused, setIsTerminalFocused] = useState(false)
-  const [cursorPosition, setCursorPosition] = useState(0)
 
   useEffect(() => {
-    // Actualizar hora cada segundo
+    // Clock tick
     const timeInterval = setInterval(() => {
       const now = new Date()
       setCurrentTime(
@@ -30,42 +36,53 @@ export default function ProgrammingEphemeris() {
           hour: "2-digit",
           minute: "2-digit",
           second: "2-digit",
-        }),
+        })
       )
     }, 1000)
 
-    // Obtener información del sistema operativo
     const osInfo = getOSInfo()
     setCloseCommand(getCloseTabCommand())
     setIsMobile(osInfo.isMobile)
 
-    // Obtener efeméride del día desde Supabase
-    const loadTodayEphemeris = async () => {
+    // Load content
+    const loadAllData = async () => {
       try {
         setIsLoading(true)
         setError(null)
+
+        // 1. Fetch Today's Ephemeris
         const ephemeris = await getTodayEphemeris()
         setTodayEphemeris(ephemeris)
+
+        // 2. Fetch Trends History from /api/daily-content
+        const historyRes = await fetch("/api/daily-content?history=1&limit=30").catch(() => null)
+        if (historyRes && historyRes.ok) {
+          const json = await historyRes.json()
+          if (json.data && Array.isArray(json.data)) {
+            setTrendsHistory(json.data)
+            if (json.data.length > 0) {
+              setSelectedContent(json.data[0])
+            }
+          }
+        }
       } catch (err) {
-        console.error('Error cargando efeméride:', err)
-        setError('Error al cargar la efeméride del día')
+        console.error("Error cargando contenido de Almaniq:", err)
+        setError("Error al conectar con la base de datos de Almaniq")
       } finally {
         setIsLoading(false)
       }
     }
 
-    loadTodayEphemeris()
-
+    loadAllData()
     return () => clearInterval(timeInterval)
   }, [])
 
+  // Typewriter effect for main ephemeris
   useEffect(() => {
     if (!todayEphemeris || isLoading) return
 
     const formattedEphemeris = formatEphemerisForDisplay(todayEphemeris)
-    const fullText = `${formattedEphemeris.date} de ${formattedEphemeris.year}:
-
-${formattedEphemeris.event}`
+    const fullText = `${formattedEphemeris.date} de ${formattedEphemeris.year}:\n\n${formattedEphemeris.event}`
 
     let index = 0
     setDisplayText("")
@@ -79,314 +96,427 @@ ${formattedEphemeris.event}`
         setIsTyping(false)
         clearInterval(typingInterval)
       }
-    }, 30)
+    }, 25)
 
     return () => clearInterval(typingInterval)
   }, [todayEphemeris, isLoading])
 
-  // Función para manejar el input del terminal
-  const handleTerminalKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      e.preventDefault() // Prevenir salto de línea
-      // Aquí se pueden añadir comandos específicos en el futuro
-      setTerminalInput("")
-      setCursorPosition(0)
-    }
-  }
-
-  // Función para manejar el cambio en el input
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newValue = e.target.value
-    // Limitar a un máximo de caracteres para evitar desbordamiento
-    const maxChars = isMobile ? 20 : 50
-    if (newValue.length <= maxChars) {
-      setTerminalInput(newValue)
-      // Actualizar la posición del cursor después de un pequeño delay
-      setTimeout(() => {
-        const target = e.target as HTMLInputElement
-        setCursorPosition(target.selectionStart || 0)
-      }, 0)
-    }
-  }
-
-  // Función para manejar el movimiento del cursor (teclado)
-  const handleCursorMoveKeyboard = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    setTimeout(() => {
-      const target = e.target as HTMLInputElement
-      setCursorPosition(target.selectionStart || 0)
-    }, 0)
-  }
-
-  // Función para manejar el movimiento del cursor (mouse)
-  const handleCursorMoveMouse = (e: React.MouseEvent<HTMLInputElement>) => {
-    setTimeout(() => {
-      const target = e.target as HTMLInputElement
-      setCursorPosition(target.selectionStart || 0)
-    }, 0)
-  }
-
-  // Función para manejar el click en el terminal
-  const handleTerminalClick = () => {
-    setIsTerminalFocused(true)
-  }
-
-  // Función para compartir en X
-  const handleShareX = () => {
-    if (!todayEphemeris) return
-
-    const formattedEphemeris = formatEphemerisForDisplay(todayEphemeris)
-
-    // Truncar solo el evento a 200 caracteres si es necesario
-    let eventText = formattedEphemeris.event
-    if (eventText.length > 200) {
-      eventText = eventText.substring(0, 197) + '...'
-    }
-
-    const tweetText = `💻 ${eventText}
-
-ℹ️ Cada día una nueva efeméride en `
-
+  // Share handlers
+  const handleShareX = (text: string) => {
+    const tweetText = `💻 ${text.substring(0, 200)}...\n\n Cada día nuevas historias en Almaniq Web:`
     const url = window.location.href
     const xUrl = `https://x.com/intent/tweet?text=${encodeURIComponent(tweetText)}&url=${encodeURIComponent(url)}`
-
-    window.open(xUrl, '_blank', 'width=550,height=420')
+    window.open(xUrl, "_blank", "width=550,height=420")
   }
 
-  // Función para renderizar el contenido de la efeméride
-  const renderEphemerisContent = () => {
-    if (isLoading) {
-      return (
-        <div className="text-green-400 leading-relaxed">
-          <pre className="whitespace-pre-wrap font-mono text-sm">
-            Cargando efeméride del día...
-            <span className="animate-pulse text-green-300 font-bold">█</span>
-          </pre>
-        </div>
-      )
-    }
+  const handleShareWhatsApp = (text: string) => {
+    const message = `🚀 *Almaniq Web | Tendencia del Día*\n\n${text}\n\nLee más en: ${window.location.href}`
+    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(message)}`, "_blank")
+  }
 
-    if (error) {
-      return (
-        <div className="text-red-400 leading-relaxed">
-          <pre className="whitespace-pre-wrap font-mono text-sm">
-            {error}
-          </pre>
-        </div>
-      )
-    }
-
-    if (!todayEphemeris) {
-      return (
-        <div className="text-yellow-400 leading-relaxed">
-          <pre className="whitespace-pre-wrap font-mono text-sm">
-            No hay efeméride disponible para hoy.
-          </pre>
-        </div>
-      )
-    }
-
+  // Filtered trends for catalog
+  const filteredTrends = trendsHistory.filter((item) => {
+    if (!searchQuery.trim()) return true
+    const q = searchQuery.toLowerCase()
     return (
-      <div className="text-green-400 leading-relaxed">
-        <pre className="whitespace-pre-wrap font-mono text-sm">
-          {displayText}
-          {isTyping && <span className="animate-pulse text-green-300 font-bold">█</span>}
-        </pre>
-      </div>
+      item.ephemeris_text.toLowerCase().includes(q) ||
+      item.date.toLowerCase().includes(q)
     )
-  }
+  })
 
   return (
-    <div className="min-h-screen bg-black relative overflow-hidden">
-      {/* Animated Background Gradient */}
-      <div className="absolute inset-0 opacity-20">
-        <div className="absolute inset-0 bg-gradient-to-br from-green-900/30 via-emerald-900/20 to-teal-900/30 animate-pulse"></div>
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-green-500/10 rounded-full blur-3xl animate-bounce-slow"></div>
-        <div className="absolute bottom-0 right-1/4 w-80 h-80 bg-emerald-500/10 rounded-full blur-3xl animate-pulse-slow"></div>
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-teal-500/5 rounded-full blur-2xl animate-spin-slow"></div>
-      </div>
-
-      {/* Subtle Grid Pattern */}
-      <div className="absolute inset-0 opacity-5">
+    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans relative overflow-x-hidden selection:bg-emerald-500/30 selection:text-emerald-300">
+      {/* Dynamic Ambient Background Glows */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
+        <div className="absolute -top-40 -left-40 w-[600px] h-[600px] bg-emerald-600/15 rounded-full blur-[140px] animate-pulse"></div>
+        <div className="absolute top-1/3 -right-40 w-[550px] h-[550px] bg-teal-600/15 rounded-full blur-[140px] animate-pulse delay-1000"></div>
+        <div className="absolute -bottom-40 left-1/3 w-[500px] h-[500px] bg-emerald-500/10 rounded-full blur-[120px]"></div>
+        {/* Fine Grid pattern */}
         <div
-          className="w-full h-full"
+          className="absolute inset-0 opacity-[0.03]"
           style={{
-            backgroundImage: `
-          linear-gradient(rgba(34, 197, 94, 0.1) 1px, transparent 1px),
-          linear-gradient(90deg, rgba(34, 197, 94, 0.1) 1px, transparent 1px)
-        `,
-            backgroundSize: "20px 20px",
+            backgroundImage: `linear-gradient(#10b981 1px, transparent 1px), linear-gradient(90deg, #10b981 1px, transparent 1px)`,
+            backgroundSize: "32px 32px",
           }}
         ></div>
       </div>
 
-      {/* Main Content with Backdrop Blur */}
-      <div className="relative z-10 min-h-screen text-green-400 font-mono p-4">
-        <div className="max-w-4xl mx-auto">
-          {/* Terminal Header with Glass Effect */}
-          <div className="flex items-center gap-2 mb-6 text-green-300 backdrop-blur-sm bg-black/20 rounded-lg p-3 border border-green-500/20">
-            <Terminal className="w-5 h-5 animate-pulse" />
-            <span className="text-sm">almaniq v1.0.0</span>
-            <div className="ml-auto flex items-center gap-2 text-sm font-light">
-              <Clock className="w-4 h-4" />
-              {currentTime}
+      {/* Main Container */}
+      <div className="relative z-10 max-w-6xl mx-auto px-4 py-6 md:py-10 flex flex-col min-h-screen">
+        
+        {/* TOP NAVBAR / HEADER */}
+        <header className="flex flex-col md:flex-row items-center justify-between gap-4 p-4 rounded-2xl bg-slate-900/80 border border-slate-800/80 backdrop-blur-xl shadow-xl shadow-slate-950/50 mb-8">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/25">
+              <Sparkles className="w-5 h-5 text-slate-950" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="font-extrabold text-xl tracking-tight bg-gradient-to-r from-emerald-300 via-teal-200 to-white bg-clip-text text-transparent">
+                  ALMANIQ WEB
+                </h1>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                  v1.0 Pro
+                </span>
+              </div>
+              <p className="text-xs text-slate-400 font-medium">
+                Efemérides de Programación & Tendencias Virales
+              </p>
             </div>
           </div>
 
-          {/* Terminal Content */}
-          <div className="space-y-4">
-            {/* Welcome Message */}
-            <div className="text-green-300 backdrop-blur-sm bg-black/10 rounded p-2">
-              <span className="text-green-500 font-bold">user@atpdev:~$</span>
-              <span className="ml-2">./almaniq --today</span>
-            </div>
+          {/* Navigation Tabs */}
+          <nav className="flex items-center p-1 rounded-xl bg-slate-950/80 border border-slate-800/80 text-xs font-semibold">
+            <button
+              onClick={() => setActiveTab("ephemeris")}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${
+                activeTab === "ephemeris"
+                  ? "bg-emerald-500 text-slate-950 font-bold shadow-md shadow-emerald-500/20"
+                  : "text-slate-400 hover:text-slate-200 hover:bg-slate-900"
+              }`}
+            >
+              <Calendar className="w-3.5 h-3.5" />
+              <span>Efeméride del Día</span>
+            </button>
+            <button
+              onClick={() => setActiveTab("trends")}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${
+                activeTab === "trends"
+                  ? "bg-emerald-500 text-slate-950 font-bold shadow-md shadow-emerald-500/20"
+                  : "text-slate-400 hover:text-slate-200 hover:bg-slate-900"
+              }`}
+            >
+              <Flame className="w-3.5 h-3.5" />
+              <span>Tendencias Virales</span>
+            </button>
+            <button
+              onClick={() => setActiveTab("history")}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${
+                activeTab === "history"
+                  ? "bg-emerald-500 text-slate-950 font-bold shadow-md shadow-emerald-500/20"
+                  : "text-slate-400 hover:text-slate-200 hover:bg-slate-900"
+              }`}
+            >
+              <BookOpen className="w-3.5 h-3.5" />
+              <span>Catálogo</span>
+            </button>
+          </nav>
 
-            {/* System Info with Glow Effect */}
-            <div className="text-green-400 text-sm space-y-1 backdrop-blur-sm bg-black/10 rounded-lg p-4 border border-green-500/10">
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 min-w-[8px] min-h-[8px] bg-green-500 rounded-full animate-pulse flex-shrink-0"></span>
-                Iniciando sistema de curiosidades, historia y tendencias...
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 min-w-[8px] min-h-[8px] bg-green-500 rounded-full flex-shrink-0"></span>
-                Conectando con la base de datos... <span className="text-green-300 font-bold">[OK]</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 min-w-[8px] min-h-[8px] bg-green-500 rounded-full flex-shrink-0"></span>
-                Cargando historias y datos virales... <span className="text-green-300 font-bold">[OK]</span>
-              </div>
-              <div className="flex items-center gap-2 text-green-300">
-                <span className="w-2 h-2 min-w-[8px] min-h-[8px] bg-green-300 rounded-full animate-pulse flex-shrink-0"></span>
-                Sistema listo. Descubre las mejores historias y tendencias día a día.
-              </div>
+          {/* Status & Clock */}
+          <div className="flex items-center gap-3 text-xs text-slate-400 font-mono">
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+              <span className="font-semibold">En Vivo</span>
             </div>
-
-            {/* Separator with Glow */}
-            <div className="relative my-6">
-              <div className="border-t border-green-800"></div>
-              <div className="absolute inset-0 border-t border-green-400/20 blur-sm"></div>
+            <div className="flex items-center gap-1 bg-slate-950 px-3 py-1 rounded-lg border border-slate-800">
+              <Clock className="w-3.5 h-3.5 text-emerald-400" />
+              <span>{currentTime}</span>
             </div>
+          </div>
+        </header>
 
-            {/* Today's Date with Glass Effect */}
-            <div className="flex items-start gap-2 text-green-300 backdrop-blur-md bg-black/20 rounded-lg p-3 border border-green-500/20">
-              <Calendar className="w-4 h-4 min-w-[16px] min-h-[16px] animate-pulse flex-shrink-0 mt-0.5" />
-              <span className="font-light">
-                Fecha actual:{" "}
-                <span className="font-normal text-green-200">
+        {/* CONTENT AREA BASED ON TAB */}
+
+        {/* TAB 1: EFEMÉRIDE DEL DÍA */}
+        {activeTab === "ephemeris" && (
+          <div className="space-y-6">
+            {/* Featured Hero Banner */}
+            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900/90 via-slate-900/60 to-slate-950 border border-emerald-500/30 p-6 md:p-8 backdrop-blur-2xl shadow-2xl shadow-emerald-500/5">
+              <div className="absolute top-0 right-0 w-80 h-80 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+              <div className="flex items-center justify-between gap-4 mb-6">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                    <Code className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-mono tracking-widest text-emerald-400 uppercase font-semibold">
+                      EFEMÉRIDE DESTACADA
+                    </span>
+                    <h2 className="text-lg md:text-xl font-bold text-white">
+                      Historia del Día en Tecnología
+                    </h2>
+                  </div>
+                </div>
+                <div className="text-xs font-mono text-slate-400 bg-slate-950/80 px-3 py-1.5 rounded-xl border border-slate-800">
                   {new Date().toLocaleDateString("es-ES", {
                     weekday: "long",
                     year: "numeric",
                     month: "long",
                     day: "numeric",
                   })}
-                </span>
-              </span>
-            </div>
-
-            {/* Ephemeris Content with Enhanced Glass Effect */}
-            <div className="backdrop-blur-md bg-gradient-to-br from-gray-900/40 to-black/60 border border-green-500/30 rounded-xl p-6 mt-6 shadow-2xl shadow-green-500/10">
-              <div className="flex items-start gap-2 text-green-300 mb-4">
-                <Code className="w-5 h-5 min-w-[20px] min-h-[20px] animate-pulse flex-shrink-0 mt-0.5" />
-                <span className="font-bold text-lg bg-gradient-to-r from-green-300 to-emerald-300 bg-clip-text text-transparent">
-                  ALMANIQ | HISTORIA DEL DÍA
-                </span>
+                </div>
               </div>
 
-              {renderEphemerisContent()}
+              {/* Ephemeris Text Display */}
+              <div className="bg-slate-950/90 rounded-2xl p-5 md:p-6 border border-slate-800/80 font-mono text-sm leading-relaxed text-emerald-300/90 shadow-inner">
+                {isLoading ? (
+                  <div className="flex items-center gap-2 text-slate-400 animate-pulse py-4">
+                    <RefreshCw className="w-4 h-4 animate-spin text-emerald-400" />
+                    <span>Cargando efeméride del día desde Supabase...</span>
+                  </div>
+                ) : error ? (
+                  <div className="text-rose-400 py-4 font-sans">{error}</div>
+                ) : (
+                  <div>
+                    <p className="whitespace-pre-wrap">{displayText}</p>
+                    {isTyping && <span className="inline-block w-2 h-4 bg-emerald-400 ml-1 animate-pulse"></span>}
+                  </div>
+                )}
+              </div>
 
-              {/* Botón de compartir en X */}
+              {/* Action Toolbar */}
               {todayEphemeris && !isLoading && (
-                <div className="flex justify-end mt-4">
-                  <button
-                    onClick={handleShareX}
-                    className="flex items-center gap-2 px-3 py-2 bg-green-500/20 hover:bg-green-500/30 border border-green-400/30 hover:border-green-400/50 rounded-lg transition-all duration-200 group backdrop-blur-sm"
-                    title="Compartir en X"
-                  >
-                    <XLogo className="text-green-400 group-hover:text-green-300" size={16} />
-                    <span className="text-green-400 group-hover:text-green-300 text-sm font-medium">
-                      Compartir
-                    </span>
-                  </button>
+                <div className="mt-6 flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-slate-800/80">
+                  <span className="text-xs text-slate-400">
+                    ¿Te gustó esta historia? Compártela con tu comunidad tech:
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleShareX(displayText)}
+                      className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition-all border border-slate-700"
+                    >
+                      <XLogo size={14} />
+                      <span>Compartir en X</span>
+                    </button>
+                    <button
+                      onClick={() => handleShareWhatsApp(displayText)}
+                      className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 text-xs font-semibold transition-all border border-emerald-500/30"
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                      <span>WhatsApp</span>
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
 
-            {/* Footer with Subtle Glow */}
-            <div className="mt-8 text-green-600 text-xs backdrop-blur-sm bg-black/10 rounded-lg p-2">
-              {/* Interactive Terminal */}
-              <div
-                className="text-green-500 mb-4 backdrop-blur-sm bg-black/10 rounded text-base cursor-text"
-                onClick={handleTerminalClick}
-              >
-                <div className="flex items-center">
-                  <span className="font-bold whitespace-nowrap text-green-500">user@atpdev:~$</span>
-                  <div className="ml-2 flex-1 relative">
-                    <div className="relative">
-                      <div className="text-green-300 font-mono whitespace-nowrap overflow-hidden max-w-full">
-                        <span>{terminalInput.slice(0, cursorPosition)}</span>
-                        <span className="animate-pulse font-bold">█</span>
-                        <span>{terminalInput.slice(cursorPosition)}</span>
-                      </div>
-                      <input
-                        type="text"
-                        value={terminalInput}
-                        onChange={handleInputChange}
-                        onKeyPress={handleTerminalKeyPress}
-                        onKeyUp={handleCursorMoveKeyboard}
-                        onClick={handleCursorMoveMouse}
-                        onFocus={() => setIsTerminalFocused(true)}
-                        onBlur={() => setIsTerminalFocused(false)}
-                        className="absolute inset-0 bg-transparent border-none outline-none text-transparent caret-transparent w-full"
-                        style={{ caretColor: 'transparent' }}
-                        maxLength={isMobile ? 20 : 50}
-                        autoFocus
-                      />
-                    </div>
-                    {/* Indicador de límite de caracteres */}
-                    {terminalInput.length >= (isMobile ? 18 : 45) && (
-                      <div className="absolute -bottom-4 right-0 text-xs text-yellow-400 opacity-70">
-                        {terminalInput.length}/{isMobile ? 20 : 50}
-                      </div>
-                    )}
-                  </div>
+            {/* Quick Teaser Grid for Virals */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 backdrop-blur-xl hover:border-emerald-500/30 transition-all group">
+                <div className="flex items-center gap-2 text-emerald-400 text-xs font-semibold mb-2">
+                  <Flame className="w-4 h-4 text-emerald-400" />
+                  <span>ALMANIQ TELEGRAM BOT</span>
                 </div>
+                <h3 className="font-bold text-slate-100 group-hover:text-emerald-300 transition-colors">
+                  Generación Interactiva de Tendencias
+                </h3>
+                <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                  Nuestro bot escanea automáticamente las efemérides y tendencias virales para publicar videos en YouTube Shorts, TikTok y Facebook.
+                </p>
+                <button
+                  onClick={() => setActiveTab("trends")}
+                  className="mt-3 flex items-center gap-1.5 text-xs font-semibold text-emerald-400 hover:underline"
+                >
+                  <span>Explorar catálogo de tendencias</span>
+                  <ExternalLink className="w-3 h-3" />
+                </button>
               </div>
 
-              <div className="text-center">
-                {!isMobile && (
-                  <div className="flex items-center justify-center gap-2">
-                    <span>{">"}</span>
-                    <span>Pulsa {closeCommand} para salir</span>
-                  </div>
-                )}
-                <div className="mt-2 text-green-500/70">
-                  © 2026{" "}
-                  <a
-                    href="https://github.com/Percy-30"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="hover:text-green-400 transition-colors duration-200 underline decoration-green-500/50 hover:decoration-green-400"
-                  >
-                    ATP Dev by Percy AT
-                  </a>
+              <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 backdrop-blur-xl hover:border-teal-500/30 transition-all group">
+                <div className="flex items-center gap-2 text-teal-400 text-xs font-semibold mb-2">
+                  <Sparkles className="w-4 h-4 text-teal-400" />
+                  <span>ALMANIQ IA & STUDIO</span>
                 </div>
-                <div className="mt-2 text-green-500/70">
-                  Desarrollado con <span className="text-red-400 animate-pulse">❤️</span> desde Andahuaylas, Perú
-                </div>
-                <div className="mt-1 text-green-500/70 text-[10px]">
-                  Basado en el proyecto original de{" "}
-                  <a
-                    href="https://github.com/mouredev/code-history-day-web"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="hover:text-green-400 transition-colors duration-200 underline decoration-green-500/50 hover:decoration-green-400"
-                  >
-                    MoureDev
-                  </a>
-                </div>
+                <h3 className="font-bold text-slate-100 group-hover:text-teal-300 transition-colors">
+                  Generador Automático de Guiones
+                </h3>
+                <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                  Genera narraciones épicas de efemérides y curiosidades científicas usando inteligencia artificial Groq & Copilot.
+                </p>
+                <button
+                  onClick={() => setActiveTab("history")}
+                  className="mt-3 flex items-center gap-1.5 text-xs font-semibold text-teal-400 hover:underline"
+                >
+                  <span>Ver publicaciones recientes</span>
+                  <ExternalLink className="w-3 h-3" />
+                </button>
               </div>
             </div>
           </div>
-        </div>
+        )}
+
+        {/* TAB 2: TENDENCIAS VIRALES (FORMATO TELEGRAM) */}
+        {activeTab === "trends" && (
+          <div className="space-y-6">
+            <div className="p-6 rounded-3xl bg-slate-900/80 border border-slate-800 backdrop-blur-xl">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                <div>
+                  <div className="flex items-center gap-2 text-emerald-400 text-xs font-mono font-semibold uppercase tracking-wider">
+                    <Flame className="w-4 h-4" />
+                    <span>CATÁLOGO DE TENDENCIAS & TELEGRAM</span>
+                  </div>
+                  <h2 className="text-xl font-bold text-white mt-1">
+                    Últimas Historias Curadas por Almaniq Bot
+                  </h2>
+                </div>
+                {/* Search Bar */}
+                <div className="relative">
+                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Buscar tendencia o fecha..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-9 pr-4 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-200 focus:outline-none focus:border-emerald-500/50 w-full md:w-64 transition-all"
+                  />
+                </div>
+              </div>
+
+              {/* Trends List / Grid */}
+              {isLoading ? (
+                <div className="py-12 text-center text-slate-400 text-xs flex justify-center items-center gap-2">
+                  <RefreshCw className="w-4 h-4 animate-spin text-emerald-400" />
+                  <span>Cargando tendencias desde la base de datos...</span>
+                </div>
+              ) : filteredTrends.length === 0 ? (
+                <div className="py-12 text-center text-slate-400 text-xs">
+                  No se encontraron tendencias registradas en el catálogo.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {filteredTrends.map((item) => (
+                    <div
+                      key={item.id}
+                      onClick={() => setSelectedContent(item)}
+                      className={`p-5 rounded-2xl border transition-all cursor-pointer ${
+                        selectedContent?.id === item.id
+                          ? "bg-emerald-950/30 border-emerald-500/50 shadow-lg shadow-emerald-500/10"
+                          : "bg-slate-950/60 border-slate-800/80 hover:border-slate-700"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 font-medium">
+                          📅 {item.date}
+                        </span>
+                        <span
+                          className={`text-[10px] font-mono px-2 py-0.5 rounded-full border ${
+                            item.status === "publicado_todo" || item.status === "publicado_youtube"
+                              ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                              : "bg-amber-500/10 text-amber-400 border-amber-500/30"
+                          }`}
+                        >
+                          {item.status}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-200 line-clamp-3 leading-relaxed font-sans">
+                        {item.ephemeris_text}
+                      </p>
+                      <div className="mt-3 flex items-center justify-between text-[11px] text-emerald-400 font-semibold pt-2 border-t border-slate-900">
+                        <span>Ver detalles de publicación →</span>
+                        {item.drive_video_url && <span>🎥 Video listo</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Selected Content Inspector Modal / Box */}
+            {selectedContent && (
+              <div className="p-6 rounded-3xl bg-gradient-to-br from-slate-900 via-slate-900/90 to-slate-950 border border-emerald-500/30 shadow-2xl">
+                <div className="flex items-center justify-between gap-2 mb-4 pb-3 border-b border-slate-800">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-5 h-5 text-emerald-400" />
+                    <h3 className="font-bold text-white text-base">
+                      Detalles de la Historia seleccionada ({selectedContent.date})
+                    </h3>
+                  </div>
+                  <button
+                    onClick={() => handleShareX(selectedContent.ephemeris_text)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-xs font-semibold hover:bg-emerald-500/20 transition-all"
+                  >
+                    <XLogo size={12} />
+                    <span>Compartir</span>
+                  </button>
+                </div>
+
+                <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 text-xs font-mono text-emerald-300 leading-relaxed whitespace-pre-wrap mb-4">
+                  {selectedContent.ephemeris_text}
+                </div>
+
+                {selectedContent.scenes && Array.isArray(selectedContent.scenes) && selectedContent.scenes.length > 0 && (
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2 font-mono">
+                      Escenas del Video Narrado:
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      {selectedContent.scenes.map((scene, idx) => (
+                        <div key={idx} className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 text-[11px]">
+                          <div className="text-emerald-400 font-bold mb-1">
+                            {scene.title || `Escena ${idx + 1}`} ({scene.time_range})
+                          </div>
+                          <p className="text-slate-300 text-[11px] leading-relaxed">{scene.narration}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* TAB 3: CATÁLOGO HISTÓRICO */}
+        {activeTab === "history" && (
+          <div className="p-6 rounded-3xl bg-slate-900/80 border border-slate-800 backdrop-blur-xl space-y-6">
+            <div className="flex items-center gap-3">
+              <BookOpen className="w-6 h-6 text-emerald-400" />
+              <div>
+                <h2 className="text-xl font-bold text-white">Catálogo Completo de Historias</h2>
+                <p className="text-xs text-slate-400">
+                  Explora todas las efemérides y curiosidades procesadas por Almaniq.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {trendsHistory.slice(0, 15).map((item, index) => (
+                <div
+                  key={item.id || index}
+                  className="p-4 rounded-xl bg-slate-950 border border-slate-800/80 hover:border-emerald-500/40 transition-all"
+                >
+                  <div className="text-[10px] font-mono text-emerald-400 mb-1">
+                    {item.date}
+                  </div>
+                  <p className="text-xs text-slate-300 line-clamp-4 leading-relaxed font-sans">
+                    {item.ephemeris_text}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* BOTTOM TERMINAL DOCK */}
+        <footer className="mt-auto pt-10">
+          <div className="p-4 rounded-2xl bg-slate-950/90 border border-slate-800/80 backdrop-blur-xl shadow-2xl font-mono text-xs text-emerald-400">
+            <div className="flex items-center justify-between gap-2 mb-2 pb-2 border-b border-slate-900 text-slate-400">
+              <div className="flex items-center gap-2">
+                <Terminal className="w-4 h-4 text-emerald-400" />
+                <span className="font-semibold text-slate-200">Terminal Interactivo Almaniq</span>
+              </div>
+              <span className="text-[10px] text-slate-500">Pulsa {closeCommand} para salir</span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-emerald-400">user@atpdev:~$</span>
+              <input
+                type="text"
+                value={terminalInput}
+                onChange={(e) => setTerminalInput(e.target.value)}
+                placeholder="./almaniq --today"
+                className="bg-transparent text-emerald-300 focus:outline-none flex-1 caret-emerald-400 font-mono text-xs"
+              />
+            </div>
+            
+            <div className="mt-3 pt-3 border-t border-slate-900/80 text-[11px] text-slate-500 flex flex-col md:flex-row items-center justify-between gap-2">
+              <div>© 2026 ATP Dev by Percy AT — Desarrollado con ❤️ desde Andahuaylas, Perú</div>
+              <div>Basado en el proyecto original de MoureDev</div>
+            </div>
+          </div>
+        </footer>
+
       </div>
     </div>
   )
