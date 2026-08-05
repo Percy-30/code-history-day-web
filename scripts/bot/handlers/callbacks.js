@@ -57,7 +57,15 @@ module.exports = function registerCallbacks(bot) {
           throw new Error('No se encontraron los archivos locales descargados.');
         }
 
-        const postText = fs.readFileSync(txtPath, 'utf-8');
+        const fullPostText = fs.readFileSync(txtPath, 'utf-8');
+        let postText = fullPostText;
+        if (fullPostText.includes('=== 📱 FACEBOOK ===')) {
+          const parts = fullPostText.split('=== 📱 FACEBOOK ===');
+          if (parts.length > 1) {
+            postText = parts[1].split('=== 🎵 TIKTOK ===')[0].trim();
+          }
+        }
+        
         const postId = await publisher.publishImageToFacebook(imgPath, postText);
 
         await bot.sendMessage(chatId, `✅ ¡Post publicado exitosamente en Facebook!\n🔗 ID: ${postId}`);
@@ -126,7 +134,7 @@ module.exports = function registerCallbacks(bot) {
         oauth2.setCredentials({ refresh_token: process.env.GOOGLE_REFRESH_TOKEN })
 
         // Cargar descripción corta
-        let postText = 'CodeHistory Daily - Efeméride tecnológica del día \n\n▶️ youtube.com/@CodeHistoryDaily\n🎵 tiktok.com/@codehistorydaily\n📱 facebook.com/CodeHistoryDaily\n\n#CodeHistoryDaily #ATPDev #Tecnologia'
+        let postText = 'CodeHistory Daily - Efeméride tecnológica del día \n\n🌐 codehistory.atpdev.dev\n▶️ youtube.com/@CodeHistoryDaily\n🎵 tiktok.com/@codehistorydaily\n📱 facebook.com/CodeHistoryDaily\n\n#CodeHistoryDaily #ATPDev #Tecnologia'
         try {
           const txtPath = path.join(state.SCENES_DIR, '05_social_media_post_' + state.TODAY + '.txt')
           if (fs.existsSync(txtPath)) postText = fs.readFileSync(txtPath, 'utf8')

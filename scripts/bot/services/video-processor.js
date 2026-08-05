@@ -10,6 +10,7 @@ const state  = require('../state')
 const config = require('../config')
 const { log } = require('../safe-action')
 const { uploadToGoogleDrive } = require('./drive')
+const { escapeHTML } = require('../utils/text')
 const botInstance = require('../utils/bot-instance')
 
 const { LOGOS_DIR, OUTRO_DIR, BGM_DIR } = config
@@ -200,14 +201,14 @@ async function procesarYPublicarShorts(inputVideoPath, chatId) {
 
     if (bot) {
       await bot.sendMessage(CHAT_ID,
-        `🎥 *Previsualización antes de publicar:*\n\n` +
-        `📁 Archivo: \`${path.basename(finalPath)}\`\n` +
-        `📦 Tamaño: *${sizeMB} MB*\n` +
+        `🎥 <b>Previsualización antes de publicar:</b>\n\n` +
+        `📁 Archivo: <code>${path.basename(finalPath)}</code>\n` +
+        `📦 Tamaño: <b>${sizeMB} MB</b>\n` +
         `🏷️ Formato: 📱 Vertical 9:16 (Shorts)\n\n` +
-        `📝 *Descripción:*\n${postTextPreview}...\n\n` +
+        `📝 <b>Descripción:</b>\n<pre>${escapeHTML(postTextPreview)}...</pre>\n\n` +
         `¿Publicar en TikTok, Facebook Reels y YouTube Shorts?`,
         {
-          parse_mode: 'Markdown',
+          parse_mode: 'HTML',
           reply_markup: {
             inline_keyboard: [
               [{ text: '✅ Publicar en todas las plataformas', callback_data: 'confirm_publish_video' }],
@@ -269,14 +270,14 @@ async function publicarVideoDirecto(inputVideoPath, chatId) {
 
     if (bot) {
       await bot.sendMessage(CHAT_ID,
-        `🎥 *Previsualización antes de publicar:*\n\n` +
-        `📁 Archivo: \`${path.basename(finalPath)}\`\n` +
-        `📦 Tamaño: *${sizeMB} MB*\n` +
+        `🎥 <b>Previsualización antes de publicar:</b>\n\n` +
+        `📁 Archivo: <code>${path.basename(finalPath)}</code>\n` +
+        `📦 Tamaño: <b>${sizeMB} MB</b>\n` +
         `🏷️ Formato: 📱 Video en crudo (Directo)\n\n` +
-        `📝 *Descripción:*\n${postTextPreview}...\n\n` +
+        `📝 <b>Descripción:</b>\n<pre>${escapeHTML(postTextPreview)}...</pre>\n\n` +
         `¿Publicar en TikTok, Facebook Reels y YouTube Shorts?`,
         {
-          parse_mode: 'Markdown',
+          parse_mode: 'HTML',
           reply_markup: {
             inline_keyboard: [
               [{ text: '✅ Publicar en todas las plataformas', callback_data: 'confirm_publish_video' }],

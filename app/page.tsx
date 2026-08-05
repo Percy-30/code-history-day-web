@@ -225,7 +225,7 @@ ${formattedEphemeris.event}`
           {/* Terminal Header with Glass Effect */}
           <div className="flex items-center gap-2 mb-6 text-green-300 backdrop-blur-sm bg-black/20 rounded-lg p-3 border border-green-500/20">
             <Terminal className="w-5 h-5 animate-pulse" />
-            <span className="text-sm">code-history v0.1.0</span>
+            <span className="text-sm">almaniq v1.0.0</span>
             <div className="ml-auto flex items-center gap-2 text-sm font-light">
               <Clock className="w-4 h-4" />
               {currentTime}
@@ -237,14 +237,14 @@ ${formattedEphemeris.event}`
             {/* Welcome Message */}
             <div className="text-green-300 backdrop-blur-sm bg-black/10 rounded p-2">
               <span className="text-green-500 font-bold">user@atpdev:~$</span>
-              <span className="ml-2">./code-history --day</span>
+              <span className="ml-2">./almaniq --today</span>
             </div>
 
             {/* System Info with Glow Effect */}
             <div className="text-green-400 text-sm space-y-1 backdrop-blur-sm bg-black/10 rounded-lg p-4 border border-green-500/10">
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 min-w-[8px] min-h-[8px] bg-green-500 rounded-full animate-pulse flex-shrink-0"></span>
-                Iniciando sistema de efemérides de programación...
+                Iniciando sistema de curiosidades, historia y tendencias...
               </div>
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 min-w-[8px] min-h-[8px] bg-green-500 rounded-full flex-shrink-0"></span>
@@ -252,11 +252,11 @@ ${formattedEphemeris.event}`
               </div>
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 min-w-[8px] min-h-[8px] bg-green-500 rounded-full flex-shrink-0"></span>
-                Cargando datos históricos... <span className="text-green-300 font-bold">[OK]</span>
+                Cargando historias y datos virales... <span className="text-green-300 font-bold">[OK]</span>
               </div>
               <div className="flex items-center gap-2 text-green-300">
                 <span className="w-2 h-2 min-w-[8px] min-h-[8px] bg-green-300 rounded-full animate-pulse flex-shrink-0"></span>
-                Sistema listo. Descubre la historia de la programación día a día.
+                Sistema listo. Descubre las mejores historias y tendencias día a día.
               </div>
             </div>
 
@@ -287,7 +287,7 @@ ${formattedEphemeris.event}`
               <div className="flex items-start gap-2 text-green-300 mb-4">
                 <Code className="w-5 h-5 min-w-[20px] min-h-[20px] animate-pulse flex-shrink-0 mt-0.5" />
                 <span className="font-bold text-lg bg-gradient-to-r from-green-300 to-emerald-300 bg-clip-text text-transparent">
-                  EFEMÉRIDE DEL DÍA
+                  ALMANIQ | HISTORIA DEL DÍA
                 </span>
               </div>
 

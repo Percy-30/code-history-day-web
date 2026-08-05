@@ -14,7 +14,7 @@ function sha256(buffer: string) {
 
 export async function GET(request: Request) {
   const TIKTOK_CLIENT_KEY = process.env.TIKTOK_CLIENT_KEY;
-  const REDIRECT_URI = 'https://code-history-day-web-alpha.vercel.app/api/tiktok/callback';
+  const REDIRECT_URI = 'https://codehistory.atpdev.dev/api/tiktok/callback';
 
   if (!TIKTOK_CLIENT_KEY) {
     return NextResponse.json({ error: 'TIKTOK_CLIENT_KEY no está configurado.' }, { status: 500 });

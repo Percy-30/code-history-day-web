@@ -192,12 +192,19 @@ export async function POST(request: NextRequest) {
         const bgUrl = getPollinationsImageUrl(coverBgPrompt, { width: 1200, height: 630, seed: baseSeed, model: 'flux' })
         
         // Construir URL de nuestra API de Satori
-        const ephemerisTitleMatch = ephemerisText.split('.')[0] || 'Evento Histórico'
+        const sentences = ephemerisText.split('.');
+        const ephemerisTitleMatch = sentences[0] ? sentences[0].trim() : 'Evento Histórico';
+        let ephemerisDescMatch = sentences.slice(1).join('.').trim();
+        if (!ephemerisDescMatch || ephemerisDescMatch.length < 10) ephemerisDescMatch = ephemerisText;
+
         const ogUrl = new URL(`${protocol}://${host}/api/og/cover`)
         ogUrl.searchParams.set('date', formattedDate)          // Fecha actual (pie de imagen)
         ogUrl.searchParams.set('ephemerisDate', fechaExplicita) // Fecha histórica REAL del evento
-        ogUrl.searchParams.set('ephemerisTitle', truncateAtWord(ephemerisTitleMatch, 100))
-        ogUrl.searchParams.set('ephemerisDesc', truncateAtWord(ephemerisText, 160) + '...')
+        ogUrl.searchParams.set('ephemerisTitle', truncateAtWord(ephemerisTitleMatch, 100) + (ephemerisTitleMatch !== 'Evento Histórico' && !ephemerisTitleMatch.endsWith('.') ? '.' : ''))
+        
+        let descTruncated = truncateAtWord(ephemerisDescMatch, 160);
+        if (ephemerisDescMatch.length > 160 && !descTruncated.endsWith('...')) descTruncated += '...';
+        ogUrl.searchParams.set('ephemerisDesc', descTruncated)
         ogUrl.searchParams.set('bg_url', bgUrl)
 
         console.log(`[Drive] Obteniendo portada final de: ${ogUrl.toString()}`)

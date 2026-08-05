@@ -23,7 +23,7 @@ Este es solo el primer capítulo. Cada día habrá uno nuevo.
 
 Sígueme si te gusta la tecnología, la programación, o simplemente esas curiosidades que nadie te contó en la escuela.
 
-🔗 Explora el proyecto completo: code-history-day-web-alpha.vercel.app
+🔗 Explora el proyecto completo: codehistory.atpdev.dev
 
 #CodeHistoryDaily #HistoriaDelCódigo #ATPDev #EfeméridesTech #Ciberseguridad #Sasser #SvenJaschan #Malware`
 

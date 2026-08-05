@@ -269,7 +269,7 @@ module.exports = function registerCommands(bot) {
           '[REFLEXIÓN — 2-3 frases conectando el evento con el presente digital]',
           '',
           '🌍 Más historias tecnológicas:',
-          'https://code-history-day-web-alpha.vercel.app',
+          'https://codehistory.atpdev.dev',
           '',
           '▶️ youtube.com/@CodeHistoryDaily',
           '',
@@ -301,7 +301,7 @@ module.exports = function registerCommands(bot) {
         `🚀 CodeHistory Daily | Efeméride Tecnológica del Día\n\n` +
         `📅 ${state.TODAY}\n\n` +
         `Descubre la historia tecnológica de hoy en CodeHistory Daily.\n\n` +
-        `🌍 Más historias tecnológicas:\nhttps://code-history-day-web-alpha.vercel.app\n\n` +
+        `🌍 Más historias tecnológicas:\nhttps://codehistory.atpdev.dev\n\n` +
         `▶️ youtube.com/@CodeHistoryDaily\n\n` +
         `🎵 tiktok.com/@codehistorydaily\n\n` +
         `📱 facebook.com/CodeHistoryDaily\n\n` +
@@ -343,28 +343,55 @@ module.exports = function registerCommands(bot) {
       return
     }
 
-    // Enviar el texto completo del post como mensaje independiente (sin límite de 1024 chars)
-    // Dividir si supera 4096 chars (límite de Telegram por mensaje)
-    const MAX_MSG = 4000
-    if (fullPostText.length <= MAX_MSG) {
-      await bot.sendMessage(CHAT_ID, `📝 <b>Texto completo del post:</b>\n\n${fullPostText}`, { parse_mode: 'HTML' })
-    } else {
-      // Enviar en partes
-      await bot.sendMessage(CHAT_ID, `📝 <b>Texto completo del post (parte 1/2):</b>\n\n${fullPostText.substring(0, MAX_MSG)}`, { parse_mode: 'HTML' })
-      await bot.sendMessage(CHAT_ID, `📝 <b>(parte 2/2):</b>\n\n${fullPostText.substring(MAX_MSG)}`, { parse_mode: 'HTML' })
+    // Extraer partes para cada red social
+    let fbText = fullPostText;
+    let ttText = '';
+    let ytText = '';
+    
+    if (fullPostText.includes('=== 📱 FACEBOOK ===')) {
+      const parts = fullPostText.split('=== 📱 FACEBOOK ===');
+      if (parts.length > 1) {
+        const rest = parts[1];
+        fbText = rest.split('=== 🎵 TIKTOK ===')[0].trim();
+        
+        if (rest.includes('=== 🎵 TIKTOK ===')) {
+          const ttParts = rest.split('=== 🎵 TIKTOK ===')[1];
+          ttText = ttParts.split('=== ▶️ YOUTUBE COMMUNITY ===')[0].trim();
+          
+          if (ttParts.includes('=== ▶️ YOUTUBE COMMUNITY ===')) {
+            ytText = ttParts.split('=== ▶️ YOUTUBE COMMUNITY ===')[1].trim();
+          }
+        }
+      }
+    }
+
+    const escapeHTML = (str) => (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+    await bot.sendMessage(CHAT_ID, `📝 <b>Texto de Facebook (EL ÚNICO QUE SE PUBLICARÁ):</b>\n\n${escapeHTML(fbText)}`, { parse_mode: 'HTML' });
+    
+    if (ttText || ytText) {
+      let otherText = '';
+      if (ttText) otherText += `=== 🎵 TIKTOK ===\n${ttText}\n\n`;
+      if (ytText) otherText += `=== ▶️ YOUTUBE COMMUNITY ===\n${ytText}`;
+      
+      const MAX_MSG = 4000;
+      if (otherText.length <= MAX_MSG) {
+        await bot.sendMessage(CHAT_ID, `📌 <b>Otros textos generados (para que los copies manualmente):</b>\n<pre>${escapeHTML(otherText)}</pre>`, { parse_mode: 'HTML' });
+      }
     }
 
     // Botones de acción
     await bot.sendMessage(CHAT_ID,
-      `¿Publicar este post en Facebook?`,
+      `¿Publicar <b>SÓLO EL TEXTO DE FACEBOOK</b> en tu página oficial?`,
       {
         reply_markup: {
           inline_keyboard: [
-            [{ text: '✅ Publicar post', callback_data: 'confirm_publish_post' }],
+            [{ text: '✅ Publicar en Facebook', callback_data: 'confirm_publish_post' }],
             [{ text: '🔄 Regenerar post con IA', callback_data: 'regenerate_post' }],
             [{ text: '❌ Cancelar', callback_data: 'cancel_publish_post' }]
           ]
-        }
+        },
+        parse_mode: 'HTML'
       }
     )
     return
@@ -541,7 +568,7 @@ Empezamos con el FOTOGRAMA 1`
         await bot.sendMessage(CHAT_ID, `✅ Post guardado en \`post_text_${targetDate}.txt\``, { parse_mode: 'Markdown' })
       } catch (err) {
         log('⚠️', `No se generó el post de redes sociales: ${err.message}`)
-        const fallbackPost = `🚀 CodeHistory Daily | Efeméride Tecnológica del Día\n\n📅 ${historicalDateStr || targetDate}\n\nDescubre la historia tecnológica de hoy en CodeHistory Daily.\n\n🌍 Más historias tecnológicas:\nhttps://code-history-day-web-alpha.vercel.app\n\n▶️ youtube.com/@CodeHistoryDaily\n\n🎵 tiktok.com/@codehistorydaily\n\n📱 facebook.com/CodeHistoryDaily\n\n#CodeHistoryDaily #HistoriaDelCódigo #ATPDev #Tecnologia #Historia`
+        const fallbackPost = `🚀 CodeHistory Daily | Efeméride Tecnológica del Día\n\n📅 ${historicalDateStr || targetDate}\n\nDescubre la historia tecnológica de hoy en CodeHistory Daily.\n\n🌍 Más historias tecnológicas:\nhttps://codehistory.atpdev.dev\n\n▶️ youtube.com/@CodeHistoryDaily\n\n🎵 tiktok.com/@codehistorydaily\n\n📱 facebook.com/CodeHistoryDaily\n\n#CodeHistoryDaily #HistoriaDelCódigo #ATPDev #Tecnologia #Historia`
         fs.writeFileSync(path.join(state.SCENES_DIR, `post_text_${targetDate}.txt`), fallbackPost, 'utf8')
       }
       
